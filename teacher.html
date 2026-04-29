@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="theme-color" content="#1a3520"/>
+  <title>EduTrack AI — Teacher</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="logo.png">
+  <link rel="icon" href="logo.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body class="dash-body">
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <img src="logo.png" alt="EduTrack AI" class="sidebar-logo-img"/>
+    <div><span class="sidebar-logo-text">EduTrack <em>AI</em></span><span class="sidebar-logo-sub">Academic Monitor</span></div>
+  </div>
+  <div class="sidebar-role"><span class="role-badge">📚 Teacher</span></div>
+  <div class="sidebar-user">
+    <div class="user-avatar" id="sidebarAvatar">SF</div>
+    <div class="user-info"><div class="user-name" id="sidebarUserName">Teacher</div><div class="user-sub" id="sidebarUserSub">CCS Faculty</div></div>
+  </div>
+  <nav class="sidebar-nav" aria-label="Teacher navigation">
+    <div class="nav-section-label">Navigation</div>
+    <a href="#" class="nav-link active" onclick="showView('classes',this)" title="My Classes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>My Classes
+    </a>
+    <a href="#" class="nav-link" onclick="showView('reports',this)" title="Risk Reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Risk Reports
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="logout-btn" onclick="logout()" title="Sign out">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main-content">
+  <header class="topbar">
+    <div class="topbar-left"><h2 id="topbarTitle">My Classes</h2><div class="breadcrumb" id="topbarBreadcrumb">Teacher Dashboard</div></div>
+    <div class="topbar-right" id="topbarRight"></div>
+  </header>
+  <main class="page-content" id="pageContent" aria-live="polite"></main>
+</div>
+
+<!-- Add Student Modal -->
+<div class="modal-overlay hidden" id="addStudentModal" role="dialog" aria-modal="true" aria-labelledby="addStudentTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="addStudentTitle">Add Student to Class</h3>
+      <button class="modal-close" onclick="closeModal('addStudentModal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Search registered students -->
+      <div class="form-group">
+        <label class="form-label" for="studentSearchInput">Search Registered Students</label>
+        <input type="search" id="studentSearchInput" class="form-input"
+          placeholder="Type name or student number..."
+          title="Search for a registered student"
+          aria-label="Search registered students"
+          oninput="searchRegisteredStudents(this.value)"/>
+      </div>
+
+      <!-- Search results list -->
+      <div id="studentSearchResults"
+        style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border);border-radius:9px;display:none">
+      </div>
+
+      <!-- Selected student preview -->
+      <div id="selectedStudentPreview" style="display:none;margin-top:12px;
+        padding:11px 14px;background:var(--green-light);border:1px solid rgba(46,125,50,0.2);
+        border-radius:9px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.1rem">✅</span>
+        <div>
+          <div id="selectedStudentName" style="font-weight:600;font-size:0.88rem;color:var(--green)"></div>
+          <div id="selectedStudentEmail" style="font-size:0.75rem;color:var(--text3)"></div>
+        </div>
+      </div>
+
+      <div id="addStudentError" style="display:none;margin-top:10px;
+        padding:10px 13px;background:var(--critical-bg);border-radius:8px;
+        font-size:0.83rem;color:var(--critical)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addStudentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmAddStudent()" id="addStudentBtn" disabled
+        style="opacity:0.5">
+        Add Student
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Grade Modal (Midterm + Finals) -->
+<div class="modal-overlay hidden" id="editGradeModal" role="dialog" aria-modal="true" aria-labelledby="editGradeTitle">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="editGradeTitle">Encode Grades</h3><button class="modal-close" onclick="closeModal('editGradeModal')" aria-label="Close">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label" for="editStudentName">Student</label><input type="text" id="editStudentName" class="form-input" title="Student name" aria-label="Student name" readonly/></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="editMidterm">Midterm Grade (0–100)</label>
+          <input type="number" id="editMidterm" class="form-input" placeholder="e.g. 78" min="0" max="100" title="Midterm grade" aria-label="Midterm grade" aria-required="true" oninput="previewGrade()"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editFinals">Finals Grade (0–100)</label>
+          <input type="number" id="editFinals" class="form-input" placeholder="e.g. 82" min="0" max="100" title="Finals grade" aria-label="Finals grade" aria-required="true" oninput="previewGrade()"/>
+        </div>
+      </div>
+      <!-- Live preview -->
+      <div id="gradePreview" style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:12px 14px;display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:0.78rem;color:var(--text3)">Computed Average</span>
+          <span id="previewAvg" style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800"></span>
+        </div>
+        <div style="margin-top:6px" id="previewRisk"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('editGradeModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmEditGrade()">Save Grades</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Student Modal -->
+<div class="modal-overlay hidden" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="deleteTitle">Remove Student</h3><button class="modal-close" onclick="closeModal('deleteModal')" aria-label="Close">✕</button></div>
+    <div class="modal-body"><p style="color:var(--text2);font-size:0.9rem">Remove <strong id="deleteStudentName" style="color:var(--text)"></strong> from this class? Their grades will also be deleted.</p></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Remove Student</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script src="app.js"></script>
+<script>
+
+let currentUser    = null;
+let currentClassId = null;
+let currentClassData = null;
+let editingEnrollmentId = null;
+let editingGradeDocId   = null;
+let deletingEnrollmentId = null;
+let deletingGradeDocId   = null;
+let searchTerm = '';
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage('teacher', (user) => {
+    currentUser = user;
+    populateSidebar(user);
+    renderClassesView();
+  });
+});
+
+function showView(view, linkEl) {
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  if (linkEl) linkEl.classList.add('active');
+  if (view === 'classes') renderClassesView();
+  else renderReportsView();
+}
+
+/* ── Classes View ── */
+async function renderClassesView() {
+  currentClassId = null;
+  setTopbar('My Classes','Teacher Dashboard');
+  document.getElementById('topbarRight').innerHTML = '';
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    const snap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
+    const classes = snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    if (!classes.length) {
+      document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No classes assigned yet</div><div class="empty-state-sub">An admin will assign classes to your account.</div></div>`;
+      return;
+    }
+
+    // Get student counts from enrollments
+    const cards = await Promise.all(classes.map(async (c,i) => {
+      const eSnap = await db.collection('enrollments').where('class_id','==',c.id).get();
+      const count = eSnap.size;
+      return `
+        <div class="class-card" style="animation-delay:${i*0.06}s" onclick="openClass('${c.id}')" role="button" tabindex="0" aria-label="Open class ${c.name}">
+          <div class="class-card-header"><div class="class-card-title">${c.name}</div><div class="class-card-sub">${c.subject||''}</div></div>
+          <div class="class-card-body">
+            <div class="class-meta">
+              <div class="class-meta-item"><span>Classcode:</span><span>${c.code||'—'}</span></div>
+              <div class="class-meta-item"><span>Schedule:</span><span>${c.schedule||'—'}</span></div>
+              <div class="class-meta-item"><span>Room:</span><span>${c.room||'—'}</span></div>
+            </div>
+            <div class="class-card-footer">
+              <div class="class-student-count">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                ${count} students
+              </div>
+              <button class="enter-btn" title="Enter class ${c.name}">Enter <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="width:11px;height:11px"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+            </div>
+          </div>
+        </div>`;
+    }));
+    document.getElementById('pageContent').innerHTML = `<div class="class-grid">${cards.join('')}</div>`;
+  } catch(err) {
+    document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Error loading classes</div><div class="empty-state-sub">${err.message}</div></div>`;
+  }
+}
+
+/* ── Class Detail ── */
+async function openClass(classId) {
+  currentClassId = classId;
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+  try {
+    const snap = await db.collection('classes').doc(classId).get();
+    currentClassData = { id:snap.id, ...snap.data() };
+    setTopbar(currentClassData.name, currentClassData.subject||'');
+    document.getElementById('topbarRight').innerHTML = `
+      <div class="tab-row" id="classTabRow">
+        <button class="tab-btn active" onclick="switchClassTab('dashboard',this)">Dashboard</button>
+        <button class="tab-btn" onclick="switchClassTab('students',this)">Students</button>
+      </div>`;
+    renderClassDashboard(classId);
+  } catch(err) { showToast('Failed to load class.','error'); }
+}
+
+function switchClassTab(tab,el) {
+  document.querySelectorAll('#classTabRow .tab-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  if (tab==='dashboard') renderClassDashboard(currentClassId);
+  else renderClassStudents(currentClassId);
+}
+
+/* ── Class Dashboard ── */
+async function renderClassDashboard(classId) {
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+  try {
+    const students = await getStudentsWithGrades(classId);
+    const risk = countRisk(students);
+    const A=students.filter(s=>s.avg>=90).length, B=students.filter(s=>s.avg>=80&&s.avg<90).length,
+          C=students.filter(s=>s.avg>=75&&s.avg<80).length, D=students.filter(s=>s.avg<75).length;
+    const mb=Math.max(A,B,C,D,1);
+
+    document.getElementById('pageContent').innerHTML = `
+      <div class="stats-row">
+        <div class="stat-card safe"><div class="stat-card-top"><span class="stat-card-label">Safe</span><div class="stat-card-icon">✅</div></div><div class="stat-card-value">${risk.safe}</div><div class="stat-card-sub">On track</div></div>
+        <div class="stat-card slight"><div class="stat-card-top"><span class="stat-card-label">Slightly At Risk</span><div class="stat-card-icon">⚠️</div></div><div class="stat-card-value">${risk.slight}</div><div class="stat-card-sub">Monitor closely</div></div>
+        <div class="stat-card moderate"><div class="stat-card-top"><span class="stat-card-label">Moderately At Risk</span><div class="stat-card-icon">🔶</div></div><div class="stat-card-value">${risk.moderate}</div><div class="stat-card-sub">Needs intervention</div></div>
+        <div class="stat-card critical"><div class="stat-card-top"><span class="stat-card-label">Critically At Risk</span><div class="stat-card-icon">🚨</div></div><div class="stat-card-value">${risk.critical}</div><div class="stat-card-sub">Immediate action</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-panel">
+          <div class="chart-title">Grade Distribution</div>
+          <div class="bar-chart">
+            ${[{l:'A (90-100)',v:A},{l:'B (80-89)',v:B},{l:'C (75-79)',v:C},{l:'D (<75)',v:D}].map(b=>`
+            <div class="bar-wrap"><div class="bar" style="height:${Math.round(b.v/mb*100)}%" title="${b.l}: ${b.v}"></div><span class="bar-label">${b.l}</span></div>`).join('')}
+          </div>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-title">Risk Distribution</div>
+          <div class="donut-wrap">
+            <div class="donut"><div class="donut-inner"></div></div>
+            <div class="donut-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:var(--safe)"></div>Safe — ${risk.safe}</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--slight)"></div>Slightly — ${risk.slight}</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--moderate)"></div>Moderate — ${risk.moderate}</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--critical)"></div>Critical — ${risk.critical}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
+}
+
+/* ── Class Students ── */
+async function renderClassStudents(classId) {
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+  try {
+    const all = await getStudentsWithGrades(classId);
+    const filtered = sortStudents(
+      searchTerm ? all.filter(s=>s.student_name.toLowerCase().includes(searchTerm.toLowerCase())) : all
+    );
+
+    const rows = filtered.map(s=>`<tr>
+      <td>${s.student_name}</td>
+      <td>${s.has_grade ? `<strong style="color:${s.avg>=75?'var(--text)':'var(--critical)'}">${s.avg.toFixed(1)}%</strong>` : '<span style="color:var(--text3);font-size:0.8rem">Not yet encoded</span>'}</td>
+      <td>${s.has_grade ? `<span style="font-size:0.78rem;color:var(--text3)">${s.midterm}% / ${s.finals}%</span>` : '—'}</td>
+      <td>${s.has_grade ? riskBadge(computeRisk(s.avg)) : '—'}</td>
+      <td>
+        <div class="action-btns">
+          <button class="action-btn" title="Encode grades for ${s.student_name}" aria-label="Encode grades for ${s.student_name}" onclick="openEditGrade('${s.enrollment_id}','${s.student_name}','${s.grade_doc_id||''}',${s.midterm||0},${s.finals||0})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="action-btn delete" title="Remove ${s.student_name}" aria-label="Remove student ${s.student_name}" onclick="openDelete('${s.enrollment_id}','${s.student_name}','${s.grade_doc_id||''}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+    document.getElementById('pageContent').innerHTML = `
+      <div class="panel">
+        <div class="panel-header">
+          <div class="search-bar" style="width:250px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <label for="studentSearch" class="sr-only">Search students</label>
+            <input type="search" id="studentSearch" class="search-input" placeholder="Search student…" title="Search by name" aria-label="Search students" oninput="searchTerm=this.value;renderClassStudents('${classId}')" value="${searchTerm}"/>
+          </div>
+          <button class="btn btn-primary" onclick="openAddStudent('${classId}')" title="Add student">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Student
+          </button>
+        </div>
+        <table class="data-table" aria-label="Students sorted alphabetically">
+          <thead><tr><th scope="col">Student Name</th><th scope="col">Average</th><th scope="col">Midterm / Finals</th><th scope="col">Risk Level</th><th scope="col">Actions</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-title">No students yet</div></div></td></tr>'}</tbody>
+        </table>
+      </div>`;
+  } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
+}
+
+/* ── Reports View ── */
+async function renderReportsView() {
+  setTopbar('Risk Reports','Teacher Dashboard');
+  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="alert('Report exported!')" title="Export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>`;
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    const classSnap = await db.collection('classes').where('profEmail','==',currentUser.email).get();
+    const classes = classSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+    const riskGroups = {critical:[],moderate:[],slight:[],safe:[]};
+    for (const c of classes) {
+      const studs = await getStudentsWithGrades(c.id);
+      studs.filter(s=>s.has_grade).forEach(s=>{
+        const r = computeRisk(s.avg);
+        const key = r==='Critically At Risk'?'critical':r==='Moderately At Risk'?'moderate':r==='Slightly At Risk'?'slight':'safe';
+        riskGroups[key].push({...s, className:c.name});
+      });
+    }
+
+    const section = (level,key) => {
+      const items = sortStudents(riskGroups[key]);
+      if (!items.length) return '';
+      return `<div class="panel" style="margin-bottom:18px">
+        <div class="panel-header"><span class="panel-title">${riskBadge(level)} — ${items.length} Student${items.length>1?'s':''}</span></div>
+        <table class="data-table"><thead><tr><th>Student</th><th>Class</th><th>Average</th><th>Risk</th></tr></thead>
+        <tbody>${items.map(s=>`<tr><td>${s.student_name}</td><td>${s.className}</td><td>${s.avg.toFixed(1)}%</td><td>${riskBadge(level)}</td></tr>`).join('')}</tbody>
+        </table></div>`;
+    };
+
+    const html = section('Critically At Risk','critical')+section('Moderately At Risk','moderate')+section('Slightly At Risk','slight')+section('Safe','safe');
+    document.getElementById('pageContent').innerHTML = html || `<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No grade data yet</div><div class="empty-state-sub">Encode student grades first.</div></div>`;
+  } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
+}
+
+/* ── Firestore helpers ── */
+async function getStudentsWithGrades(classId) {
+  const [eSnap, gSnap] = await Promise.all([
+    db.collection('enrollments').where('class_id','==',classId).get(),
+    db.collection('grades').where('class_id','==',classId).get()
+  ]);
+  const gradesMap = {};
+  gSnap.docs.forEach(d => { gradesMap[d.data().enrollment_id] = {id:d.id,...d.data()}; });
+  return eSnap.docs.map(d => {
+    const e = {enrollment_id:d.id,...d.data()};
+    const g = gradesMap[d.id];
+    return {
+      enrollment_id: d.id,
+      student_name:  e.student_name,
+      midterm:       g?.midterm_grade  || 0,
+      finals:        g?.finals_grade   || 0,
+      avg:           g?.average_grade  || 0,
+      grade_doc_id:  g?.id             || null,
+      has_grade:     !!g
+    };
+  });
+}
+
+function countRisk(students) {
+  return students.filter(s=>s.has_grade).reduce((a,s)=>{
+    const r=computeRisk(s.avg);
+    if(r==='Safe') a.safe++; else if(r==='Slightly At Risk') a.slight++;
+    else if(r==='Moderately At Risk') a.moderate++; else a.critical++;
+    return a;
+  },{safe:0,slight:0,moderate:0,critical:0});
+}
+
+/* ── Grade preview ── */
+function previewGrade() {
+  const m = parseFloat(document.getElementById('editMidterm').value);
+  const f = parseFloat(document.getElementById('editFinals').value);
+  const preview = document.getElementById('gradePreview');
+  if (isNaN(m) || isNaN(f)) { preview.style.display='none'; return; }
+  const avg = (m+f)/2;
+  const riskLevel = computeRisk(avg);
+  const riskColor = riskLevel==='Safe'?'var(--safe)':riskLevel==='Slightly At Risk'?'var(--slight)':riskLevel==='Moderately At Risk'?'var(--moderate)':'var(--critical)';
+  document.getElementById('previewAvg').textContent  = avg.toFixed(1)+'%';
+  document.getElementById('previewAvg').style.color  = riskColor;
+  document.getElementById('previewRisk').innerHTML   = riskBadge(riskLevel);
+  preview.style.display = 'block';
+}
+
+/* ── Modals ── */
+/* ── Add Student (search from registered users) ── */
+let selectedStudentForAdd = null;
+
+function openAddStudent(classId) {
+  currentClassId      = classId;
+  selectedStudentForAdd = null;
+
+  // Reset modal
+  const searchInput = document.getElementById('studentSearchInput');
+  const results     = document.getElementById('studentSearchResults');
+  const preview     = document.getElementById('selectedStudentPreview');
+  const errBox      = document.getElementById('addStudentError');
+  const addBtn      = document.getElementById('addStudentBtn');
+
+  if (searchInput) searchInput.value = '';
+  if (results)     { results.innerHTML = ''; results.style.display = 'none'; }
+  if (preview)     preview.style.display = 'none';
+  if (errBox)      errBox.style.display  = 'none';
+  if (addBtn)      { addBtn.disabled = true; addBtn.style.opacity = '0.5'; }
+
+  document.getElementById('addStudentModal').classList.remove('hidden');
+  setTimeout(() => searchInput?.focus(), 100);
+}
+
+async function searchRegisteredStudents(query) {
+  const results  = document.getElementById('studentSearchResults');
+  const errBox   = document.getElementById('addStudentError');
+  if (errBox) errBox.style.display = 'none';
+
+  if (!query || query.trim().length < 2) {
+    results.style.display = 'none';
+    results.innerHTML = '';
+    return;
+  }
+
+  results.style.display = 'block';
+  results.innerHTML = `<div style="padding:12px 14px;font-size:0.82rem;color:var(--text3)">Searching…</div>`;
+
+  try {
+    // Get all registered students from users + pending_users
+    const [usersSnap, pendingSnap] = await Promise.all([
+      db.collection('users').where('role','==','student').get(),
+      db.collection('pending_users').where('role','==','student').get()
+    ]);
+
+    const q = query.toLowerCase().trim();
+    const allStudents = [
+      ...usersSnap.docs.map(d => ({ id:d.id, source:'users', ...d.data() })),
+      ...pendingSnap.docs.map(d => ({ id:d.id, source:'pending', ...d.data() }))
+    ].filter(s =>
+      (s.name  || '').toLowerCase().includes(q) ||
+      (s.email || '').toLowerCase().includes(q)
+    );
+
+    if (!allStudents.length) {
+      results.innerHTML = `
+        <div style="padding:14px;text-align:center;font-size:0.82rem;color:var(--text3)">
+          No registered students found for "<strong>${query}</strong>"
+          <div style="margin-top:6px;font-size:0.77rem">Make sure the student is registered in the system first.</div>
+        </div>`;
+      return;
+    }
+
+    // Get already-enrolled students to prevent duplicates
+    const enrolledSnap = await db.collection('enrollments')
+      .where('class_id','==', currentClassId).get();
+    const enrolledEmails = new Set(
+      enrolledSnap.docs.map(d => (d.data().student_email||'').toLowerCase())
+    );
+
+    results.innerHTML = allStudents.map(s => {
+      const alreadyIn = enrolledEmails.has((s.email||'').toLowerCase());
+      return `
+        <div onclick="${alreadyIn ? '' : `selectStudentForAdd('${s.id}','${(s.name||'').replace(/'/g,"\\'")}','${s.email||''}')`}"
+          style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:${alreadyIn?'not-allowed':'pointer'};
+            display:flex;align-items:center;justify-content:space-between;
+            background:${alreadyIn?'var(--bg3)':'var(--surface)'};
+            transition:background 0.15s"
+          onmouseover="if(!${alreadyIn}) this.style.background='var(--surface2)'"
+          onmouseout="if(!${alreadyIn}) this.style.background='var(--surface)'">
+          <div>
+            <div style="font-size:0.86rem;font-weight:600;color:${alreadyIn?'var(--text3)':'var(--text)'}">${s.name||'—'}</div>
+            <div style="font-size:0.74rem;color:var(--text3)">${s.email||''} ${s.source==='pending'?'<span style="color:var(--moderate)">(pending login)</span>':''}</div>
+          </div>
+          ${alreadyIn
+            ? `<span style="font-size:0.72rem;color:var(--slight);background:var(--slight-bg);padding:2px 8px;border-radius:999px">Already enrolled</span>`
+            : `<span style="font-size:0.72rem;color:var(--green)">➕ Select</span>`
+          }
+        </div>`;
+    }).join('');
+
+  } catch(err) {
+    results.innerHTML = `<div style="padding:12px 14px;font-size:0.82rem;color:var(--critical)">Error: ${err.message}</div>`;
+  }
+}
+
+function selectStudentForAdd(studentId, studentName, studentEmail) {
+  selectedStudentForAdd = { id:studentId, name:studentName, email:studentEmail };
+
+  // Show preview
+  document.getElementById('selectedStudentName').textContent  = studentName;
+  document.getElementById('selectedStudentEmail').textContent = studentEmail;
+  const preview = document.getElementById('selectedStudentPreview');
+  preview.style.display = 'flex';
+
+  // Enable Add button
+  const addBtn = document.getElementById('addStudentBtn');
+  addBtn.disabled = false;
+  addBtn.style.opacity = '1';
+
+  // Clear search results
+  document.getElementById('studentSearchResults').style.display = 'none';
+  document.getElementById('studentSearchInput').value = studentName;
+}
+
+async function confirmAddStudent() {
+  if (!selectedStudentForAdd) {
+    document.getElementById('addStudentError').style.display = 'block';
+    document.getElementById('addStudentError').textContent = 'Please select a student from the search results.';
+    return;
+  }
+
+  const addBtn = document.getElementById('addStudentBtn');
+  addBtn.disabled = true;
+  addBtn.textContent = 'Adding…';
+
+  try {
+    await db.collection('enrollments').add({
+      student_name:  selectedStudentForAdd.name,
+      student_email: selectedStudentForAdd.email,
+      class_id:      currentClassId,
+      class_name:    currentClassData?.name    || '',
+      subject_name:  currentClassData?.subject || '',
+      enrolled_by:   currentUser.uid,
+      enrolled_at:   firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    await db.collection('classes').doc(currentClassId).update({
+      students: firebase.firestore.FieldValue.increment(1)
+    });
+
+    closeModal('addStudentModal');
+    showToast(`${selectedStudentForAdd.name} added successfully.`);
+    renderClassStudents(currentClassId);
+
+  } catch(err) {
+    document.getElementById('addStudentError').style.display = 'block';
+    document.getElementById('addStudentError').textContent = 'Failed to add student: ' + err.message;
+    addBtn.disabled = false;
+    addBtn.style.opacity = '1';
+    addBtn.textContent = 'Add Student';
+  }
+}
+
+function openEditGrade(enrollmentId, studentName, gradeDocId, midterm, finals) {
+  editingEnrollmentId = enrollmentId;
+  editingGradeDocId   = gradeDocId || null;
+  document.getElementById('editStudentName').value = studentName;
+  document.getElementById('editMidterm').value     = midterm || '';
+  document.getElementById('editFinals').value      = finals  || '';
+  document.getElementById('gradePreview').style.display = 'none';
+  if (midterm || finals) previewGrade();
+  document.getElementById('editGradeModal').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('editMidterm').focus(),100);
+}
+
+async function confirmEditGrade() {
+  const midterm = parseFloat(document.getElementById('editMidterm').value);
+  const finals  = parseFloat(document.getElementById('editFinals').value);
+  if (isNaN(midterm)||midterm<0||midterm>100||isNaN(finals)||finals<0||finals>100) {
+    showToast('Enter valid grades between 0 and 100.','error'); return;
+  }
+  const avg    = (midterm+finals)/2;
+  const risk   = computeRisk(avg);
+  const status = computeStatus(avg);
+  const studentName = document.getElementById('editStudentName').value;
+
+  const gradeData = {
+    enrollment_id: editingEnrollmentId,
+    student_name:  studentName,
+    class_id:      currentClassId,
+    class_name:    currentClassData?.name    || '',
+    subject_name:  currentClassData?.subject || '',
+    midterm_grade: midterm,
+    finals_grade:  finals,
+    average_grade: avg,
+    risk_level:    risk,
+    passing_status:status,
+    encoded_by:    currentUser.uid,
+    updated_at:    firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try {
+    if (editingGradeDocId) {
+      await db.collection('grades').doc(editingGradeDocId).update(gradeData);
+    } else {
+      await db.collection('grades').add(gradeData);
+    }
+    // Save risk assessment
+    await db.collection('risk_assessments').doc(`${currentClassId}_${editingEnrollmentId}`).set({
+      student_name:   studentName,
+      class_id:       currentClassId,
+      average_grade:  avg,
+      risk_level:     risk,
+      passing_status: status,
+      assessed_at:    firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeModal('editGradeModal');
+    showToast('Grades saved successfully.');
+    renderClassStudents(currentClassId);
+  } catch(err) { showToast('Failed to save grades: '+err.message,'error'); }
+}
+
+function openDelete(enrollmentId, studentName, gradeDocId) {
+  deletingEnrollmentId = enrollmentId;
+  deletingGradeDocId   = gradeDocId || null;
+  document.getElementById('deleteStudentName').textContent = studentName;
+  document.getElementById('deleteModal').classList.remove('hidden');
+}
+
+async function confirmDelete() {
+  try {
+    const batch = db.batch();
+    batch.delete(db.collection('enrollments').doc(deletingEnrollmentId));
+    if (deletingGradeDocId) batch.delete(db.collection('grades').doc(deletingGradeDocId));
+    await batch.commit();
+    await db.collection('classes').doc(currentClassId).update({
+      students: firebase.firestore.FieldValue.increment(-1)
+    });
+    closeModal('deleteModal');
+    showToast('Student removed.');
+    renderClassStudents(currentClassId);
+  } catch(err) { showToast('Failed to remove student: '+err.message,'error'); }
+}
+
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function setTopbar(t,b) { document.getElementById('topbarTitle').textContent=t; document.getElementById('topbarBreadcrumb').textContent=b; }
+function loadingHTML() { return `<div style="display:flex;align-items:center;justify-content:center;height:40vh"><div class="spinner" style="width:30px;height:30px;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div></div>`; }
+</script>
+</body>
+</html>

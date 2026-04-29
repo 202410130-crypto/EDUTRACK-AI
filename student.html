@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="theme-color" content="#1a3520"/>
+  <title>EduTrack AI — Student</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="logo.png">
+  <link rel="icon" href="logo.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body class="dash-body">
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <img src="logo.png" alt="EduTrack AI" class="sidebar-logo-img"/>
+    <div><span class="sidebar-logo-text">EduTrack <em>AI</em></span><span class="sidebar-logo-sub">Academic Monitor</span></div>
+  </div>
+  <div class="sidebar-role"><span class="role-badge">🎓 Student</span></div>
+  <div class="sidebar-user">
+    <div class="user-avatar" id="sidebarAvatar">ML</div>
+    <div class="user-info"><div class="user-name" id="sidebarUserName">Student</div><div class="user-sub" id="sidebarUserSub">BSCS 2B</div></div>
+  </div>
+  <nav class="sidebar-nav" aria-label="Student navigation">
+    <div class="nav-section-label">Navigation</div>
+    <a href="#" class="nav-link active" onclick="showSection('overview',this)" title="Overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Overview
+    </a>
+    <a href="#" class="nav-link" onclick="showSection('subjects',this)" title="My Subjects">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>My Subjects
+    </a>
+    <a href="#" class="nav-link" onclick="showSection('progress',this)" title="Performance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Performance
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="logout-btn" onclick="logout()" title="Sign out">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main-content">
+  <header class="topbar">
+    <div class="topbar-left"><h2 id="topbarTitle">Academic Overview</h2><div class="breadcrumb" id="topbarBreadcrumb">Student Dashboard</div></div>
+    <div class="topbar-right" id="topbarRight"></div>
+  </header>
+  <main class="page-content" id="pageContent" aria-live="polite"></main>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script src="app.js"></script>
+<script>
+
+let studentSubjects = [];
+let currentStudentUser = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage('student', async (user) => {
+    currentStudentUser = user;
+    populateSidebar(user);
+    await loadGrades(user.name);
+    showSection('overview');
+  });
+});
+
+async function loadGrades(studentName) {
+  try {
+    const snap = await db.collection('grades')
+      .where('student_name','==', studentName)
+      .get();
+
+    if (snap.empty) {
+      // No Firestore grades yet — show placeholder
+      studentSubjects = [];
+      return;
+    }
+
+    studentSubjects = snap.docs.map(d => {
+      const g = d.data();
+      return {
+        name:    g.subject_name || g.class_name || 'Unknown Subject',
+        avg:     g.average_grade  || 0,
+        midterm: g.midterm_grade  || 0,
+        finals:  g.finals_grade   || 0
+      };
+    });
+
+  } catch(err) {
+    console.error('Failed to load grades:', err);
+    studentSubjects = [];
+  }
+}
+
+function showSection(section, linkEl) {
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  if (linkEl) linkEl.classList.add('active');
+  if (section==='overview')  renderOverview();
+  else if (section==='subjects')  renderSubjects();
+  else if (section==='progress')  renderProgress();
+}
+
+function riskColor(avg) {
+  const r = computeRisk(avg);
+  return r==='Safe'?'var(--safe)':r==='Slightly At Risk'?'var(--slight)':r==='Moderately At Risk'?'var(--moderate)':'var(--critical)';
+}
+
+function noGradesHTML() {
+  return `<div class="empty-state" style="margin-top:40px">
+    <div class="empty-state-icon">📝</div>
+    <div class="empty-state-title">No grades encoded yet</div>
+    <div class="empty-state-sub">Your teacher hasn't encoded your grades yet. Check back soon.</div>
+  </div>`;
+}
+
+function renderOverview() {
+  document.getElementById('topbarTitle').textContent = 'Academic Overview';
+  document.getElementById('topbarBreadcrumb').textContent = 'Student Dashboard';
+
+  if (!studentSubjects.length) { document.getElementById('pageContent').innerHTML = noGradesHTML(); return; }
+
+  const risk = studentSubjects.reduce((a,s)=>{
+    const r=computeRisk(s.avg);
+    if(r==='Safe') a.safe++; else if(r==='Slightly At Risk') a.slight++;
+    else if(r==='Moderately At Risk') a.moderate++; else a.critical++;
+    return a;
+  },{safe:0,slight:0,moderate:0,critical:0});
+
+  document.getElementById('pageContent').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card safe"><div class="stat-card-top"><span class="stat-card-label">Safe</span><div class="stat-card-icon">✅</div></div><div class="stat-card-value">${risk.safe}</div><div class="stat-card-sub">Subjects on track</div></div>
+      <div class="stat-card slight"><div class="stat-card-top"><span class="stat-card-label">Slightly At Risk</span><div class="stat-card-icon">⚠️</div></div><div class="stat-card-value">${risk.slight}</div><div class="stat-card-sub">Monitor closely</div></div>
+      <div class="stat-card moderate"><div class="stat-card-top"><span class="stat-card-label">Moderately At Risk</span><div class="stat-card-icon">🔶</div></div><div class="stat-card-value">${risk.moderate}</div><div class="stat-card-sub">Needs improvement</div></div>
+      <div class="stat-card critical"><div class="stat-card-top"><span class="stat-card-label">Critically At Risk</span><div class="stat-card-icon">🚨</div></div><div class="stat-card-value">${risk.critical}</div><div class="stat-card-sub">Immediate action</div></div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-panel">
+        <div class="chart-title">Subject Performance</div>
+        <div class="subject-bars">
+          ${studentSubjects.map(s=>`
+          <div class="subj-bar-row">
+            <span class="subj-name" title="${s.name}">${s.name}</span>
+            <div class="subj-bar-track" role="progressbar" aria-valuenow="${s.avg}" aria-valuemin="0" aria-valuemax="100" aria-label="${s.name}: ${s.avg}%">
+              <div class="subj-bar-fill" style="width:${s.avg}%;background:${riskColor(s.avg)}"></div>
+            </div>
+            <span class="subj-score" style="color:${riskColor(s.avg)}">${s.avg.toFixed(1)}%</span>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-title">Risk Distribution</div>
+        <div class="donut-wrap">
+          <div class="donut" role="img" aria-label="Risk donut chart"><div class="donut-inner"></div></div>
+          <div class="donut-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--safe)"></div>Safe — ${risk.safe}</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--slight)"></div>Slightly — ${risk.slight}</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--moderate)"></div>Moderate — ${risk.moderate}</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--critical)"></div>Critical — ${risk.critical}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Detailed Grades</span></div>
+      <table class="data-table" aria-label="Grades by subject">
+        <thead><tr><th scope="col">Subject</th><th scope="col">Average</th><th scope="col">Risk Level</th><th scope="col">Status</th></tr></thead>
+        <tbody>
+          ${studentSubjects.map(s=>`<tr>
+            <td>${s.name}</td>
+            <td><strong style="color:${riskColor(s.avg)}">${s.avg.toFixed(1)}%</strong></td>
+            <td>${riskBadge(computeRisk(s.avg))}</td>
+            <td>${statusBadge(computeStatus(s.avg))}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderSubjects() {
+  document.getElementById('topbarTitle').textContent = 'My Subjects';
+  document.getElementById('topbarBreadcrumb').textContent = 'Student Dashboard';
+
+  if (!studentSubjects.length) { document.getElementById('pageContent').innerHTML = noGradesHTML(); return; }
+
+  const cards = studentSubjects.map(s=>{
+    const color = riskColor(s.avg);
+    return `
+    <div class="panel" style="padding:0;overflow:hidden">
+      <div class="panel-header"><span class="panel-title">${s.name}</span>${riskBadge(computeRisk(s.avg))}</div>
+      <div style="padding:16px 18px">
+        <div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+            <span style="font-size:0.77rem;color:var(--text3)">Overall Average</span>
+            <span style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:${color}">${s.avg.toFixed(1)}%</span>
+          </div>
+          <div class="subj-bar-track" style="height:8px" role="progressbar" aria-valuenow="${s.avg}" aria-valuemin="0" aria-valuemax="100" aria-label="${s.name} average">
+            <div class="subj-bar-fill" style="width:${s.avg}%;background:${color}"></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:9px;font-size:0.79rem">
+          ${['Midterm','Finals'].map((p,i)=>{
+            const v = [s.midterm, s.finals][i];
+            return `<div style="padding:9px;background:var(--bg3);border-radius:8px;text-align:center;border:1px solid var(--border)">
+              <div style="color:var(--text3);margin-bottom:3px;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">${p}</div>
+              <div style="font-weight:700;color:var(--text)">${v}%</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="margin-top:10px;display:flex;justify-content:flex-end">${statusBadge(computeStatus(s.avg))}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('pageContent').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:15px">${cards}</div>`;
+}
+
+function renderProgress() {
+  document.getElementById('topbarTitle').textContent = 'Performance Analysis';
+  document.getElementById('topbarBreadcrumb').textContent = 'Student Dashboard';
+
+  if (!studentSubjects.length) { document.getElementById('pageContent').innerHTML = noGradesHTML(); return; }
+
+  document.getElementById('pageContent').innerHTML = `
+    <div class="chart-panel" style="margin-bottom:18px">
+      <div class="chart-title">Subject Performance Comparison</div>
+      <div class="bar-chart" style="height:150px">
+        ${studentSubjects.map(s=>`
+        <div class="bar-wrap">
+          <div class="bar" style="height:${s.avg}%;background:${riskColor(s.avg)}" title="${s.name}: ${s.avg}%" role="img" aria-label="${s.name}: ${s.avg}%"></div>
+          <span class="bar-label">${s.name}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Midterm → Finals Breakdown</span></div>
+      <div style="padding:18px">
+        ${studentSubjects.map(s=>`
+        <div style="margin-bottom:16px">
+          <div style="font-size:0.84rem;font-weight:600;margin-bottom:7px;color:var(--text)">${s.name}</div>
+          ${['Midterm','Finals'].map((p,i)=>{
+            const v=[s.midterm,s.finals][i];
+            return `<div class="subj-bar-row" style="margin-bottom:4px">
+              <span class="subj-name" style="width:65px;font-size:0.73rem;color:var(--text3)">${p}</span>
+              <div class="subj-bar-track" role="progressbar" aria-valuenow="${v}" aria-valuemin="0" aria-valuemax="100" aria-label="${s.name} ${p}: ${v}%">
+                <div class="subj-bar-fill" style="width:${v}%;background:var(--green)"></div>
+              </div>
+              <span class="subj-score" style="color:var(--green)">${v}%</span>
+            </div>`;
+          }).join('')}
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+</script>
+</body>
+</html>

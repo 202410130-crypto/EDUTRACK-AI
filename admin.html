@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#1a3520"/>
+  <title>EduTrack AI — Admin</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="logo.png">
+  <link rel="icon" href="logo.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body class="dash-body">
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <img src="logo.png" alt="EduTrack AI" class="sidebar-logo-img"/>
+    <div><span class="sidebar-logo-text">EduTrack <em>AI</em></span><span class="sidebar-logo-sub">Academic Monitor</span></div>
+  </div>
+  <div class="sidebar-role"><span class="role-badge">⚙️ Admin</span></div>
+  <div class="sidebar-user">
+    <div class="user-avatar" id="sidebarAvatar">AD</div>
+    <img id="sidebarPhoto" style="display:none;width:33px;height:33px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="Profile"/>
+    <div class="user-info">
+      <div class="user-name" id="sidebarUserName">Admin</div>
+      <div class="user-sub" id="sidebarUserSub">Administrator</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav" aria-label="Admin navigation">
+    <div class="nav-section-label">Navigation</div>
+
+    <a href="#" class="nav-link active" onclick="showView('classes',this)" title="Classes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      Classes
+    </a>
+
+    <a href="#" class="nav-link" onclick="showView('register',this)" title="Register New User">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+      Register User
+    </a>
+
+    <a href="#" class="nav-link" onclick="showView('users',this)" title="All Users">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      All Users
+    </a>
+
+    <a href="#" class="nav-link" onclick="showView('overview',this)" title="Overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Overview
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <button class="logout-btn" onclick="logout()" title="Sign out">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main-content">
+  <header class="topbar">
+    <div class="topbar-left">
+      <h2 id="topbarTitle">Classes</h2>
+      <div class="breadcrumb" id="topbarBreadcrumb">Admin Dashboard</div>
+    </div>
+    <div class="topbar-right" id="topbarRight"></div>
+  </header>
+  <main class="page-content" id="pageContent" aria-live="polite"></main>
+</div>
+
+<!-- Add Class Modal -->
+<div class="modal-overlay hidden" id="addClassModal" role="dialog" aria-modal="true" aria-labelledby="addClassTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="addClassTitle">Add New Class</h3>
+      <button class="modal-close" onclick="closeModal('addClassModal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="nCode">Classcode</label><input type="text" id="nCode" class="form-input" placeholder="e.g. 43172" title="Classcode" aria-label="Classcode" aria-required="true"/></div>
+        <div class="form-group"><label class="form-label" for="nRoom">Room</label><input type="text" id="nRoom" class="form-input" placeholder="e.g. 401" title="Room" aria-label="Room"/></div>
+      </div>
+      <div class="form-group"><label class="form-label" for="nSubject">Subject Name</label><input type="text" id="nSubject" class="form-input" placeholder="e.g. Networking 1 LEC" title="Subject" aria-label="Subject" aria-required="true"/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="nCourse">Course / Year / Block</label><input type="text" id="nCourse" class="form-input" placeholder="e.g. BSCS 2B" title="Course" aria-label="Course" aria-required="true"/></div>
+        <div class="form-group"><label class="form-label" for="nSchedule">Schedule</label><input type="text" id="nSchedule" class="form-input" placeholder="e.g. M 7:00-9:00 AM" title="Schedule" aria-label="Schedule"/></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="nProfessor">Assign Professor</label>
+        <select id="nProfessor" class="form-select" title="Assign professor" aria-label="Assign professor" aria-required="true">
+          <option value="" disabled selected>Loading professors…</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addClassModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmAddClass()">Add Class</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Class Modal -->
+<div class="modal-overlay hidden" id="editClassModal" role="dialog" aria-modal="true" aria-labelledby="editClassTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="editClassTitle">Edit Class</h3>
+      <button class="modal-close" onclick="closeModal('editClassModal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="eCode">Classcode</label><input type="text" id="eCode" class="form-input" placeholder="e.g. 43172" title="Classcode" aria-label="Classcode"/></div>
+        <div class="form-group"><label class="form-label" for="eRoom">Room</label><input type="text" id="eRoom" class="form-input" placeholder="e.g. 401" title="Room" aria-label="Room"/></div>
+      </div>
+      <div class="form-group"><label class="form-label" for="eSubject">Subject Name</label><input type="text" id="eSubject" class="form-input" placeholder="Subject name" title="Subject" aria-label="Subject"/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="eCourse">Course / Year / Block</label><input type="text" id="eCourse" class="form-input" placeholder="e.g. BSCS 2B" title="Course" aria-label="Course"/></div>
+        <div class="form-group"><label class="form-label" for="eSchedule">Schedule</label><input type="text" id="eSchedule" class="form-input" placeholder="Schedule" title="Schedule" aria-label="Schedule"/></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="eProfessor">Assign Professor</label>
+        <select id="eProfessor" class="form-select" title="Professor" aria-label="Assign professor">
+          <option value="" disabled>Loading…</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('editClassModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmEditClass()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Class Modal -->
+<div class="modal-overlay hidden" id="deleteClassModal" role="dialog" aria-modal="true" aria-labelledby="delClassTitle">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="delClassTitle">Delete Class</h3><button class="modal-close" onclick="closeModal('deleteClassModal')" aria-label="Close">✕</button></div>
+    <div class="modal-body"><p style="color:var(--text2);font-size:0.9rem">Delete <strong id="deleteClassName" style="color:var(--text)"></strong>? This cannot be undone.</p></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('deleteClassModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDeleteClass()">Delete Class</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete User Modal -->
+<div class="modal-overlay hidden" id="deleteUserModal" role="dialog" aria-modal="true" aria-labelledby="delUserTitle">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="delUserTitle">Remove User</h3><button class="modal-close" onclick="closeModal('deleteUserModal')" aria-label="Close">✕</button></div>
+    <div class="modal-body"><p style="color:var(--text2);font-size:0.9rem">Remove <strong id="deleteUserName" style="color:var(--text)"></strong>? They will no longer be able to log in.</p></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('deleteUserModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDeleteUser()">Remove User</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script src="app.js"></script>
+<script>
+
+const DOMAIN = 'gordoncollege.edu.ph';
+let editingClassId   = null;
+let deletingClassId  = null;
+let deletingUserMeta = null;
+let currentAdminUser = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage('admin', (user) => {
+    currentAdminUser = user;
+    populateSidebar(user);
+    showView('classes');
+  });
+});
+
+function showView(view, linkEl) {
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  if (linkEl) linkEl.classList.add('active');
+  if      (view === 'classes')  renderClasses();
+  else if (view === 'register') renderRegisterUser();
+  else if (view === 'users')    renderUsers();
+  else if (view === 'overview') renderOverview();
+}
+
+function loadingHTML() {
+  return `<div style="display:flex;align-items:center;justify-content:center;height:40vh">
+    <div class="spinner" style="width:30px;height:30px;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div>
+  </div>`;
+}
+
+/* =============================================
+   REGISTER USER
+   ============================================= */
+function renderRegisterUser() {
+  document.getElementById('topbarTitle').textContent = 'Register New User';
+  document.getElementById('topbarBreadcrumb').textContent = 'Admin Dashboard';
+  document.getElementById('topbarRight').innerHTML = '';
+
+  document.getElementById('pageContent').innerHTML = `
+    <div style="max-width:560px;margin:0 auto">
+
+      <!-- Info banner -->
+      <div style="background:var(--green-light);border:1px solid rgba(46,125,50,0.2);border-radius:12px;padding:14px 18px;margin-bottom:22px;display:flex;gap:12px;align-items:flex-start">
+        <span style="font-size:1.3rem;flex-shrink:0">ℹ️</span>
+        <div style="font-size:0.84rem;color:var(--green);line-height:1.7">
+          <strong>How domain login works:</strong><br/>
+          Register each user here with their official <strong>@${DOMAIN}</strong> Google Workspace email.
+          Once registered, they go to the login page and click <strong>"Sign in with Google"</strong>
+          using their school account — no password needed. The system detects their role automatically.
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Register New User</span>
+        </div>
+        <div style="padding:22px;display:flex;flex-direction:column;gap:15px">
+
+          <div class="form-group">
+            <label class="form-label" for="regName">Full Name</label>
+            <input type="text" id="regName" class="form-input"
+              placeholder="e.g. Juan Dela Cruz"
+              title="Full name" aria-label="Full name" aria-required="true"/>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="regEmail">School Email Address</label>
+            <input type="email" id="regEmail" class="form-input"
+              placeholder="e.g. jdelacruz@${DOMAIN}"
+              title="School email" aria-label="School email" aria-required="true"/>
+            <span id="regEmailError" class="field-error-msg hidden" role="alert" aria-live="polite"></span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="regRole">Role</label>
+            <select id="regRole" class="form-select"
+              title="User role" aria-label="User role" aria-required="true"
+              onchange="toggleRegFields()">
+              <option value="" disabled selected>— Select role —</option>
+              <option value="student">🎓 Student</option>
+              <option value="teacher">📚 Teacher</option>
+              <option value="coordinator">📋 Program Coordinator</option>
+              <option value="admin">⚙️ Admin</option>
+            </select>
+          </div>
+
+          <!-- Student-only fields -->
+          <div id="studentFields" style="display:none;flex-direction:column;gap:13px">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="regProgram">Program</label>
+                <select id="regProgram" class="form-select" title="Program" aria-label="Degree program">
+                  <option value="BSCS">BSCS</option>
+                  <option value="BSIT">BSIT</option>
+                  <option value="BSIS">BSIS</option>
+                  <option value="BSN">BSN</option>
+                  <option value="BSED">BSED</option>
+                  <option value="BSBA">BSBA</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="regYear">Year Level</label>
+                <select id="regYear" class="form-select" title="Year level" aria-label="Year level">
+                  <option value="1">1st Year</option>
+                  <option value="2">2nd Year</option>
+                  <option value="3">3rd Year</option>
+                  <option value="4">4th Year</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="regSection">Section</label>
+              <input type="text" id="regSection" class="form-input"
+                placeholder="e.g. BSCS 2B"
+                title="Section" aria-label="Section"/>
+            </div>
+          </div>
+
+          <!-- Teacher/Coordinator-only fields -->
+          <div id="staffFields" style="display:none">
+            <div class="form-group">
+              <label class="form-label" for="regDept">Department</label>
+              <input type="text" id="regDept" class="form-input"
+                placeholder="e.g. CCS Faculty"
+                title="Department" aria-label="Department"/>
+            </div>
+          </div>
+
+          <!-- Error box -->
+          <div id="regError" style="display:none;background:var(--critical-bg);border:1px solid rgba(198,40,40,0.22);border-radius:9px;padding:11px 14px;font-size:0.84rem;color:var(--critical);line-height:1.5"></div>
+
+          <button class="btn btn-primary" onclick="confirmRegisterUser()"
+            style="width:100%;justify-content:center;padding:13px;font-size:0.95rem"
+            title="Register this user">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              style="width:16px;height:16px" aria-hidden="true">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="8.5" cy="7" r="4"/>
+              <line x1="20" y1="8" x2="20" y2="14"/>
+              <line x1="23" y1="11" x2="17" y2="11"/>
+            </svg>
+            Register User
+          </button>
+
+        </div>
+      </div>
+    </div>`;
+}
+
+function toggleRegFields() {
+  const role = document.getElementById('regRole').value;
+  const sf   = document.getElementById('studentFields');
+  const tf   = document.getElementById('staffFields');
+  if (sf) sf.style.display = role === 'student' ? 'flex' : 'none';
+  if (tf) tf.style.display = (role === 'teacher' || role === 'coordinator') ? 'block' : 'none';
+}
+
+async function confirmRegisterUser() {
+  const name   = document.getElementById('regName').value.trim();
+  const email  = document.getElementById('regEmail').value.trim().toLowerCase();
+  const role   = document.getElementById('regRole').value;
+  const errBox = document.getElementById('regError');
+  const eeEl   = document.getElementById('regEmailError');
+
+  // Reset errors
+  if (errBox) errBox.style.display = 'none';
+  if (eeEl)   eeEl.classList.add('hidden');
+
+  // Validate
+  if (!name) {
+    errBox.style.display = 'block';
+    errBox.textContent   = '⚠ Please enter the full name.';
+    return;
+  }
+  if (!email) {
+    eeEl.classList.remove('hidden');
+    eeEl.textContent = '⚠ Email is required.';
+    return;
+  }
+  if (!email.endsWith('@' + DOMAIN)) {
+    eeEl.classList.remove('hidden');
+    eeEl.textContent = `⚠ Email must end with @${DOMAIN}`;
+    return;
+  }
+  if (!role) {
+    errBox.style.display = 'block';
+    errBox.textContent   = '⚠ Please select a role.';
+    return;
+  }
+
+  // Build document
+  const userDoc = {
+    email, name, role,
+    is_active:  true,
+    created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    created_by: currentAdminUser?.uid || ''
+  };
+
+  if (role === 'student') {
+    userDoc.program    = document.getElementById('regProgram')?.value || '';
+    userDoc.year_level = parseInt(document.getElementById('regYear')?.value || '1');
+    userDoc.section    = document.getElementById('regSection')?.value.trim() || '';
+    userDoc.dept       = '';
+  } else if (role === 'teacher' || role === 'coordinator') {
+    userDoc.dept    = document.getElementById('regDept')?.value.trim() || '';
+    userDoc.section = '';
+  } else {
+    userDoc.dept    = 'Administrator';
+    userDoc.section = '';
+  }
+
+  try {
+    // Check duplicates
+    const [existing, existingPending] = await Promise.all([
+      db.collection('users').where('email', '==', email).get(),
+      db.collection('pending_users').where('email', '==', email).get()
+    ]);
+
+    if (!existing.empty || !existingPending.empty) {
+      errBox.style.display = 'block';
+      errBox.textContent   = `⚠ ${email} is already registered.`;
+      return;
+    }
+
+    // Save to pending_users — doc ID is the email for easy lookup
+    await db.collection('pending_users').doc(email).set(userDoc);
+
+    showToast(`✅ ${name} registered! They can now sign in with Google.`);
+
+    // Reset form
+    document.getElementById('regName').value  = '';
+    document.getElementById('regEmail').value = '';
+    document.getElementById('regRole').value  = '';
+    toggleRegFields();
+
+  } catch (err) {
+    errBox.style.display = 'block';
+    errBox.textContent   = 'Registration failed: ' + err.message;
+  }
+}
+
+/* =============================================
+   ALL USERS LIST
+   ============================================= */
+async function renderUsers() {
+  document.getElementById('topbarTitle').textContent = 'All Users';
+  document.getElementById('topbarBreadcrumb').textContent = 'Admin Dashboard';
+  document.getElementById('topbarRight').innerHTML = `
+    <button class="topbar-btn primary" onclick="showView('register', document.querySelector('.nav-link:nth-child(2)'))" title="Register user">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        style="width:13px;height:13px" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Register User
+    </button>`;
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    const [uSnap, pSnap] = await Promise.all([
+      db.collection('users').get(),
+      db.collection('pending_users').get()
+    ]);
+
+    const active  = uSnap.docs.map(d => ({ id:d.id, ...d.data(), status:'active'  }));
+    const pending = pSnap.docs.map(d => ({ id:d.id, ...d.data(), status:'pending' }));
+    const all     = [...active, ...pending].sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+    if (!all.length) {
+      document.getElementById('pageContent').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">👥</div>
+          <div class="empty-state-title">No users registered yet</div>
+          <div class="empty-state-sub">Click "Register User" in the sidebar to add students, teachers, and coordinators.</div>
+        </div>`;
+      return;
+    }
+
+    const roleColors = { teacher:'safe', coordinator:'slight', student:'moderate', admin:'critical' };
+    const roleEmojis = { teacher:'📚', coordinator:'📋', student:'🎓', admin:'⚙️' };
+
+    const rows = all.map(u => `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:9px">
+          ${u.photo_url
+            ? `<img src="${u.photo_url}" style="width:28px;height:28px;border-radius:50%;object-fit:cover" alt="${u.name}"/>`
+            : `<div style="width:28px;height:28px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:0.71rem;font-weight:700;color:var(--green)">${(u.name||'U').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase()}</div>`}
+          <span style="font-weight:500">${u.name||'—'}</span>
+        </div>
+      </td>
+      <td><span class="risk-badge ${roleColors[u.role]||'safe'}">${roleEmojis[u.role]||''} ${u.role}</span></td>
+      <td style="font-size:0.78rem;color:var(--text2)">${u.email}</td>
+      <td style="font-size:0.78rem;color:var(--text3)">${u.section||u.dept||'—'}</td>
+      <td>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:0.71rem;font-weight:600;
+          ${u.status==='active' ? 'color:#2e7d32;background:#e8f5e9' : 'color:var(--moderate);background:var(--moderate-bg)'}">
+          ${u.status === 'active' ? '● Active' : '○ Pending login'}
+        </span>
+      </td>
+      <td>
+        <button class="action-btn delete" title="Remove ${u.name||''}" aria-label="Remove ${u.name||''}"
+          onclick="openDeleteUser('${u.id}','${(u.name||'User').replace(/'/g,"\\'")}','${u.status}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
+      </td>
+    </tr>`).join('');
+
+    document.getElementById('pageContent').innerHTML = `
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Registered Users (${all.length})</span>
+          <span style="font-size:0.75rem;color:var(--text3)">
+            ${active.length} active &nbsp;·&nbsp; ${pending.length} pending first login
+          </span>
+        </div>
+        <table class="data-table" aria-label="All registered users">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Role</th>
+              <th scope="col">Email</th>
+              <th scope="col">Section / Dept</th>
+              <th scope="col">Status</th>
+              <th scope="col">Remove</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+
+  } catch (err) {
+    document.getElementById('pageContent').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚠️</div>
+        <div class="empty-state-title">Failed to load users</div>
+        <div class="empty-state-sub">${err.message}</div>
+      </div>`;
+  }
+}
+
+function openDeleteUser(id, name, status) {
+  deletingUserMeta = { id, status };
+  document.getElementById('deleteUserName').textContent = name;
+  document.getElementById('deleteUserModal').classList.remove('hidden');
+}
+
+async function confirmDeleteUser() {
+  try {
+    const col = deletingUserMeta.status === 'active' ? 'users' : 'pending_users';
+    await db.collection(col).doc(deletingUserMeta.id).delete();
+    closeModal('deleteUserModal');
+    showToast('User removed successfully.');
+    renderUsers();
+  } catch(err) {
+    showToast('Failed to remove user: ' + err.message, 'error');
+  }
+}
+
+/* =============================================
+   CLASSES
+   ============================================= */
+async function renderClasses() {
+  document.getElementById('topbarTitle').textContent = 'Classes';
+  document.getElementById('topbarBreadcrumb').textContent = 'Admin Dashboard';
+  document.getElementById('topbarRight').innerHTML = `
+    <button class="topbar-btn primary" onclick="openAddClass()" title="Add class">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        style="width:13px;height:13px" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Add Class
+    </button>`;
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    const snap    = await db.collection('classes').orderBy('created_at', 'desc').get();
+    const classes = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+    if (!classes.length) {
+      document.getElementById('pageContent').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🏫</div>
+          <div class="empty-state-title">No classes yet</div>
+          <div class="empty-state-sub">Click "Add Class" to create your first class.</div>
+        </div>`;
+      return;
+    }
+
+    const cards = classes.map((c, i) => `
+      <div class="class-card" style="animation-delay:${i*0.06}s">
+        <div class="class-card-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="class-card-title">${c.name}</div>
+            <div class="class-card-sub">${c.subject||''}</div>
+          </div>
+          <div style="display:flex;gap:5px;margin-top:2px">
+            <button class="action-btn" title="Edit ${c.name}" aria-label="Edit class ${c.name}"
+              onclick="openEditClass('${c.id}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="action-btn delete" title="Delete ${c.name}" aria-label="Delete class ${c.name}"
+              onclick="openDeleteClass('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="class-card-body">
+          <div class="class-meta">
+            <div class="class-meta-item"><span>Classcode:</span><span>${c.code||'—'}</span></div>
+            <div class="class-meta-item"><span>Schedule:</span><span>${c.schedule||'—'}</span></div>
+            <div class="class-meta-item"><span>Room:</span><span>${c.room||'—'}</span></div>
+            <div class="class-meta-item"><span>Professor:</span><span style="color:var(--green);font-weight:500">${c.professor||'—'}</span></div>
+          </div>
+          <div class="class-card-footer">
+            <div class="class-student-count">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              ${c.students||0} students
+            </div>
+            <span style="font-size:0.7rem;color:var(--text3)">${c.profEmail||''}</span>
+          </div>
+        </div>
+      </div>`).join('');
+
+    document.getElementById('pageContent').innerHTML = `<div class="class-grid">${cards}</div>`;
+
+  } catch (err) {
+    document.getElementById('pageContent').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚠️</div>
+        <div class="empty-state-title">${err.message}</div>
+      </div>`;
+  }
+}
+
+async function loadTeachersIntoSelect(selId, selectedEmail) {
+  try {
+    const [uSnap, pSnap] = await Promise.all([
+      db.collection('users').where('role','in',['teacher','coordinator']).get(),
+      db.collection('pending_users').where('role','in',['teacher','coordinator']).get()
+    ]);
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="" disabled selected>— Select professor —</option>';
+    [...uSnap.docs, ...pSnap.docs].forEach(d => {
+      const u   = d.data();
+      const val = `${u.name}|${u.email}`;
+      const opt = document.createElement('option');
+      opt.value       = val;
+      opt.textContent = `${u.name}${d.ref.parent.id==='pending_users' ? ' (pending)' : ''}`;
+      if (selectedEmail && u.email === selectedEmail) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.error('Failed to load teachers:', e); }
+}
+
+async function openAddClass() {
+  ['nCode','nRoom','nSubject','nCourse','nSchedule'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('addClassModal').classList.remove('hidden');
+  await loadTeachersIntoSelect('nProfessor');
+  setTimeout(() => document.getElementById('nCourse').focus(), 100);
+}
+
+async function confirmAddClass() {
+  const code    = document.getElementById('nCode').value.trim();
+  const subj    = document.getElementById('nSubject').value.trim();
+  const course  = document.getElementById('nCourse').value.trim();
+  const profVal = document.getElementById('nProfessor').value;
+
+  if (!code || !subj || !course || !profVal) {
+    showToast('Please fill in all required fields.', 'error');
+    return;
+  }
+  const [profName, profEmail] = profVal.split('|');
+  try {
+    await db.collection('classes').add({
+      name:course, code, subject:subj,
+      schedule: document.getElementById('nSchedule').value.trim() || 'TBD',
+      room:     document.getElementById('nRoom').value.trim()     || 'TBD',
+      professor:profName, profEmail, students:0, is_active:true,
+      created_by: currentAdminUser?.uid || '',
+      created_at: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeModal('addClassModal');
+    showToast(`Class "${course}" added and assigned to ${profName}.`);
+    renderClasses();
+  } catch(err) { showToast('Failed to add class: ' + err.message, 'error'); }
+}
+
+async function openEditClass(classId) {
+  editingClassId = classId;
+  try {
+    const snap = await db.collection('classes').doc(classId).get();
+    const c = snap.data();
+    document.getElementById('eCode').value     = c.code     || '';
+    document.getElementById('eRoom').value     = c.room     || '';
+    document.getElementById('eSubject').value  = c.subject  || '';
+    document.getElementById('eCourse').value   = c.name     || '';
+    document.getElementById('eSchedule').value = c.schedule || '';
+    document.getElementById('editClassModal').classList.remove('hidden');
+    await loadTeachersIntoSelect('eProfessor', c.profEmail);
+  } catch(err) { showToast('Failed to load class.', 'error'); }
+}
+
+async function confirmEditClass() {
+  const profVal = document.getElementById('eProfessor').value;
+  if (!profVal) { showToast('Please assign a professor.', 'error'); return; }
+  const [profName, profEmail] = profVal.split('|');
+  try {
+    await db.collection('classes').doc(editingClassId).update({
+      code:     document.getElementById('eCode').value.trim(),
+      room:     document.getElementById('eRoom').value.trim(),
+      subject:  document.getElementById('eSubject').value.trim(),
+      name:     document.getElementById('eCourse').value.trim(),
+      schedule: document.getElementById('eSchedule').value.trim(),
+      professor:profName, profEmail,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeModal('editClassModal');
+    showToast('Class updated successfully.');
+    renderClasses();
+  } catch(err) { showToast('Failed to update: ' + err.message, 'error'); }
+}
+
+function openDeleteClass(classId, className) {
+  deletingClassId = classId;
+  document.getElementById('deleteClassName').textContent = className;
+  document.getElementById('deleteClassModal').classList.remove('hidden');
+}
+
+async function confirmDeleteClass() {
+  try {
+    await db.collection('classes').doc(deletingClassId).delete();
+    closeModal('deleteClassModal');
+    showToast('Class deleted.');
+    renderClasses();
+  } catch(err) { showToast('Failed to delete: ' + err.message, 'error'); }
+}
+
+/* =============================================
+   OVERVIEW
+   ============================================= */
+async function renderOverview() {
+  document.getElementById('topbarTitle').textContent = 'System Overview';
+  document.getElementById('topbarBreadcrumb').textContent = 'Admin Dashboard';
+  document.getElementById('topbarRight').innerHTML = '';
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    const [cSnap, uSnap, pSnap] = await Promise.all([
+      db.collection('classes').get(),
+      db.collection('users').get(),
+      db.collection('pending_users').get()
+    ]);
+    const classes = cSnap.docs.map(d => d.data());
+    const total   = classes.reduce((a,c) => a + (c.students||0), 0);
+
+    document.getElementById('pageContent').innerHTML = `
+      <div class="stats-row">
+        <div class="stat-card safe">
+          <div class="stat-card-top"><span class="stat-card-label">Total Classes</span><div class="stat-card-icon">🏫</div></div>
+          <div class="stat-card-value">${classes.length}</div><div class="stat-card-sub">Active classes</div>
+        </div>
+        <div class="stat-card slight">
+          <div class="stat-card-top"><span class="stat-card-label">Active Users</span><div class="stat-card-icon">✅</div></div>
+          <div class="stat-card-value">${uSnap.size}</div><div class="stat-card-sub">Logged in at least once</div>
+        </div>
+        <div class="stat-card moderate">
+          <div class="stat-card-top"><span class="stat-card-label">Pending Users</span><div class="stat-card-icon">⏳</div></div>
+          <div class="stat-card-value">${pSnap.size}</div><div class="stat-card-sub">Registered, not yet logged in</div>
+        </div>
+        <div class="stat-card critical">
+          <div class="stat-card-top"><span class="stat-card-label">Enrolled Students</span><div class="stat-card-icon">🎓</div></div>
+          <div class="stat-card-value">${total}</div><div class="stat-card-sub">Across all classes</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Class Assignments</span>
+          <span style="font-size:0.75rem;color:var(--green);background:var(--green-light);padding:3px 10px;border-radius:999px;font-weight:600">🔒 @${DOMAIN} only</span>
+        </div>
+        <table class="data-table" aria-label="Class overview">
+          <thead>
+            <tr>
+              <th scope="col">Class</th>
+              <th scope="col">Subject</th>
+              <th scope="col">Professor</th>
+              <th scope="col">Schedule</th>
+              <th scope="col">Students</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${classes.map(c => `<tr>
+              <td><strong>${c.name}</strong></td>
+              <td>${c.subject||'—'}</td>
+              <td style="color:var(--green);font-weight:500">${c.professor||'—'}</td>
+              <td>${c.schedule||'—'}</td>
+              <td>${c.students||0}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(err) {
+    document.getElementById('pageContent').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚠️</div>
+        <div class="empty-state-title">${err.message}</div>
+      </div>`;
+  }
+}
+
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+</script>
+</body>
+</html>

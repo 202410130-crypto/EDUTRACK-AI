@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Simple check: is the user logged in?
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // ── Users ──
+    match /users/{uid} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() && request.auth.uid == uid;
+      allow delete: if isSignedIn();
+    }
+
+    // ── Pending users ──
+    match /pending_users/{docId} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // ── Classes ──
+    match /classes/{classId} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // ── Enrollments ──
+    match /enrollments/{id} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // ── Grades ──
+    match /grades/{id} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // ── Risk assessments ──
+    match /risk_assessments/{id} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // ── Reports ──
+    match /reports/{id} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn();
+    }
+  }
+}

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="theme-color" content="#1a3520"/>
+  <title>EduTrack AI — Coordinator</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="logo.png">
+  <link rel="icon" href="logo.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body class="dash-body">
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <img src="logo.png" alt="EduTrack AI" class="sidebar-logo-img"/>
+    <div><span class="sidebar-logo-text">EduTrack <em>AI</em></span><span class="sidebar-logo-sub">Academic Monitor</span></div>
+  </div>
+  <div class="sidebar-role"><span class="role-badge">📋 Coordinator</span></div>
+  <div class="sidebar-user">
+    <div class="user-avatar" id="sidebarAvatar">NI</div>
+    <div class="user-info"><div class="user-name" id="sidebarUserName">Coordinator</div><div class="user-sub" id="sidebarUserSub">BSCS Coordinator</div></div>
+  </div>
+  <nav class="sidebar-nav" aria-label="Coordinator navigation">
+    <div class="nav-section-label">Navigation</div>
+    <a href="#" class="nav-link active" onclick="showView('classes',this)" title="All Classes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>All Classes
+    </a>
+    <a href="#" class="nav-link" onclick="showView('reports',this)" title="Risk Reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Risk Reports
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="logout-btn" onclick="logout()" title="Sign out">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign Out
+    </button>
+  </div>
+</aside>
+
+<div class="main-content">
+  <header class="topbar">
+    <div class="topbar-left"><h2 id="topbarTitle">All Classes</h2><div class="breadcrumb" id="topbarBreadcrumb">Program Coordinator Dashboard</div></div>
+    <div class="topbar-right" id="topbarRight"></div>
+  </header>
+  <main class="page-content" id="pageContent" aria-live="polite"></main>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script src="app.js"></script>
+<script>
+
+let currentClass = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage('coordinator', (user) => {
+    populateSidebar(user);
+    showView('classes');
+  });
+});
+
+function showView(view, linkEl) {
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  if (linkEl) linkEl.classList.add('active');
+  if (view==='classes') renderClasses();
+  else renderReports();
+}
+
+function loadingHTML() { return `<div style="display:flex;align-items:center;justify-content:center;height:40vh"><div class="spinner" style="width:30px;height:30px;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div></div>`; }
+
+/* ── All Classes ── */
+async function renderClasses() {
+  currentClass = null;
+  document.getElementById('topbarTitle').textContent = 'All Classes';
+  document.getElementById('topbarBreadcrumb').textContent = 'Program Coordinator Dashboard';
+  document.getElementById('topbarRight').innerHTML = '';
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    const snap = await db.collection('classes').get();
+    const classes = snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    if (!classes.length) {
+      document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No classes created yet</div><div class="empty-state-sub">Admin needs to add classes first.</div></div>`;
+      return;
+    }
+
+    // Get enrollment counts
+    const cards = await Promise.all(classes.map(async (c,i)=>{
+      const eSnap = await db.collection('enrollments').where('class_id','==',c.id).get();
+      const gSnap = await db.collection('grades').where('class_id','==',c.id).get();
+      const grades = gSnap.docs.map(d=>d.data());
+      const risk = grades.length ? countRiskFromGrades(grades) : {safe:0,slight:0,moderate:0,critical:0};
+      return `
+        <div class="class-card" style="animation-delay:${i*0.06}s" onclick="openClass('${c.id}')" role="button" tabindex="0" aria-label="View ${c.name}">
+          <div class="class-card-header"><div class="class-card-title">${c.name}</div><div class="class-card-sub">${c.subject||''}</div></div>
+          <div class="class-card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:13px">
+              <div style="padding:8px;background:var(--safe-bg);border-radius:8px;text-align:center">
+                <div style="font-size:1.1rem;font-weight:800;color:var(--safe)">${risk.safe}</div>
+                <div style="font-size:0.67rem;color:var(--text3)">Safe</div>
+              </div>
+              <div style="padding:8px;background:var(--critical-bg);border-radius:8px;text-align:center">
+                <div style="font-size:1.1rem;font-weight:800;color:var(--critical)">${risk.critical}</div>
+                <div style="font-size:0.67rem;color:var(--text3)">Critical</div>
+              </div>
+            </div>
+            <div class="class-card-footer">
+              <div class="class-student-count">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                ${eSnap.size} students
+              </div>
+              <button class="enter-btn" title="View ${c.name}">View <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="width:11px;height:11px"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+            </div>
+          </div>
+        </div>`;
+    }));
+    document.getElementById('pageContent').innerHTML = `<div class="class-grid">${cards.join('')}</div>`;
+  } catch(err) {
+    document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`;
+  }
+}
+
+/* ── Class Detail ── */
+async function openClass(classId) {
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+  try {
+    const snap = await db.collection('classes').doc(classId).get();
+    currentClass = { id:snap.id, ...snap.data() };
+    document.getElementById('topbarTitle').textContent = currentClass.name;
+    document.getElementById('topbarBreadcrumb').textContent = currentClass.subject||'';
+    document.getElementById('topbarRight').innerHTML = `
+      <div class="tab-row" id="classTabs">
+        <button class="tab-btn active" onclick="switchTab('dashboard',this)">Dashboard</button>
+        <button class="tab-btn" onclick="switchTab('students',this)">Students</button>
+      </div>`;
+    renderClassDashboard(classId);
+  } catch(err) { showToast('Failed to load class.','error'); }
+}
+
+function switchTab(tab,el) {
+  document.querySelectorAll('#classTabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  if (tab==='dashboard') renderClassDashboard(currentClass.id);
+  else renderClassStudents(currentClass.id);
+}
+
+async function renderClassDashboard(classId) {
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+  try {
+    const gSnap = await db.collection('grades').where('class_id','==',classId).get();
+    const grades = gSnap.docs.map(d=>d.data());
+    const risk = countRiskFromGrades(grades);
+    const A=grades.filter(g=>g.average_grade>=90).length, B=grades.filter(g=>g.average_grade>=80&&g.average_grade<90).length,
+          C=grades.filter(g=>g.average_grade>=75&&g.average_grade<80).length, D=grades.filter(g=>g.average_grade<75).length;
+    const mb=Math.max(A,B,C,D,1);
+
+    document.getElementById('pageContent').innerHTML = `
+      <div class="stats-row">
+        <div class="stat-card safe"><div class="stat-card-top"><span class="stat-card-label">Safe</span><div class="stat-card-icon">✅</div></div><div class="stat-card-value">${risk.safe}</div><div class="stat-card-sub">On track</div></div>
+        <div class="stat-card slight"><div class="stat-card-top"><span class="stat-card-label">Slightly At Risk</span><div class="stat-card-icon">⚠️</div></div><div class="stat-card-value">${risk.slight}</div><div class="stat-card-sub">Monitor</div></div>
+        <div class="stat-card moderate"><div class="stat-card-top"><span class="stat-card-label">Moderately At Risk</span><div class="stat-card-icon">🔶</div></div><div class="stat-card-value">${risk.moderate}</div><div class="stat-card-sub">Intervention</div></div>
+        <div class="stat-card critical"><div class="stat-card-top"><span class="stat-card-label">Critically At Risk</span><div class="stat-card-icon">🚨</div></div><div class="stat-card-value">${risk.critical}</div><div class="stat-card-sub">Immediate</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-panel">
+          <div class="chart-title">Grade Distribution</div>
+          <div class="bar-chart">
+            ${[{l:'A (90-100)',v:A},{l:'B (80-89)',v:B},{l:'C (75-79)',v:C},{l:'D (<75)',v:D}].map(b=>`
+            <div class="bar-wrap"><div class="bar" style="height:${Math.round(b.v/mb*100)}%"></div><span class="bar-label">${b.l}</span></div>`).join('')}
+          </div>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-title">Risk Distribution</div>
+          <div class="donut-wrap">
+            <div class="donut"><div class="donut-inner"></div></div>
+            <div class="donut-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:var(--safe)"></div>Safe — ${risk.safe}</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--slight)"></div>Slightly — ${risk.slight}</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--moderate)"></div>Moderate — ${risk.moderate}</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--critical)"></div>Critical — ${risk.critical}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
+}
+
+async function renderClassStudents(classId) {
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+  try {
+    const [eSnap, gSnap] = await Promise.all([
+      db.collection('enrollments').where('class_id','==',classId).get(),
+      db.collection('grades').where('class_id','==',classId).get()
+    ]);
+    const gradesMap = {};
+    gSnap.docs.forEach(d=>{ gradesMap[d.data().enrollment_id]={id:d.id,...d.data()}; });
+
+    const students = eSnap.docs.map(d=>{
+      const e={enrollment_id:d.id,...d.data()};
+      const g=gradesMap[d.id];
+      return {...e, avg:g?.average_grade||0, has_grade:!!g};
+    });
+
+    const sorted = sortStudents(students);
+    const rows = sorted.map(s=>`<tr>
+      <td>${s.student_name}</td>
+      <td>${s.has_grade?`<strong style="color:${s.avg>=75?'var(--text)':'var(--critical)'}">${s.avg.toFixed(1)}%</strong>`:'<span style="color:var(--text3);font-size:0.8rem">Not encoded</span>'}</td>
+      <td>${s.has_grade?riskBadge(computeRisk(s.avg)):'—'}</td>
+      <td>${s.has_grade?statusBadge(computeStatus(s.avg)):'—'}</td>
+    </tr>`).join('');
+
+    document.getElementById('pageContent').innerHTML = `
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Students — ${sorted.length} (A–Z)</span>
+          <button class="btn btn-primary" onclick="alert('Report exported!')" title="Export">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export
+          </button>
+        </div>
+        <table class="data-table" aria-label="Students sorted alphabetically">
+          <thead><tr><th scope="col">Student Name</th><th scope="col">Average</th><th scope="col">Risk Level</th><th scope="col">Status</th></tr></thead>
+          <tbody>${rows||'<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-title">No students enrolled yet</div></div></td></tr>'}</tbody>
+        </table>
+      </div>`;
+  } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
+}
+
+/* ── Risk Reports ── */
+async function renderReports() {
+  document.getElementById('topbarTitle').textContent = 'Risk Reports';
+  document.getElementById('topbarBreadcrumb').textContent = 'Program Coordinator Dashboard';
+  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="alert('Reports exported!')" title="Export all">Export All</button>`;
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    const gSnap = await db.collection('grades').get();
+    const allGrades = gSnap.docs.map(d=>d.data());
+    const critical = sortStudents(allGrades.filter(g=>computeRisk(g.average_grade)==='Critically At Risk').map(g=>({student_name:g.student_name,className:g.class_name||g.subject_name,avg:g.average_grade})));
+    const moderate = sortStudents(allGrades.filter(g=>computeRisk(g.average_grade)==='Moderately At Risk').map(g=>({student_name:g.student_name,className:g.class_name||g.subject_name,avg:g.average_grade})));
+
+    if (!allGrades.length) {
+      document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No grades encoded yet</div><div class="empty-state-sub">Teachers need to encode grades first.</div></div>`;
+      return;
+    }
+
+    const section = (level,items) => {
+      if (!items.length) return '';
+      return `<div class="panel" style="margin-bottom:18px">
+        <div class="panel-header"><span class="panel-title">${riskBadge(level)} — ${items.length} Student${items.length>1?'s':''}</span></div>
+        <table class="data-table"><thead><tr><th>Name</th><th>Class</th><th>Average</th><th>Risk</th></tr></thead>
+        <tbody>${items.map(s=>`<tr><td>${s.student_name}</td><td>${s.className||'—'}</td><td>${s.avg.toFixed(1)}%</td><td>${riskBadge(level)}</td></tr>`).join('')}</tbody>
+        </table></div>`;
+    };
+
+    document.getElementById('pageContent').innerHTML =
+      section('Critically At Risk',critical)+section('Moderately At Risk',moderate);
+  } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
+}
+
+function countRiskFromGrades(grades) {
+  return grades.reduce((a,g)=>{
+    const r=computeRisk(g.average_grade||0);
+    if(r==='Safe') a.safe++; else if(r==='Slightly At Risk') a.slight++;
+    else if(r==='Moderately At Risk') a.moderate++; else a.critical++;
+    return a;
+  },{safe:0,slight:0,moderate:0,critical:0});
+}
+</script>
+</body>
+</html>
