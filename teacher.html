@@ -50,48 +50,13 @@
 <!-- Add Student Modal -->
 <div class="modal-overlay hidden" id="addStudentModal" role="dialog" aria-modal="true" aria-labelledby="addStudentTitle">
   <div class="modal">
-    <div class="modal-header">
-      <h3 class="modal-title" id="addStudentTitle">Add Student to Class</h3>
-      <button class="modal-close" onclick="closeModal('addStudentModal')" aria-label="Close">✕</button>
-    </div>
+    <div class="modal-header"><h3 class="modal-title" id="addStudentTitle">Add New Student</h3><button class="modal-close" onclick="closeModal('addStudentModal')" aria-label="Close">✕</button></div>
     <div class="modal-body">
-
-      <!-- Search registered students -->
-      <div class="form-group">
-        <label class="form-label" for="studentSearchInput">Search Registered Students</label>
-        <input type="search" id="studentSearchInput" class="form-input"
-          placeholder="Type name or student number..."
-          title="Search for a registered student"
-          aria-label="Search registered students"
-          oninput="searchRegisteredStudents(this.value)"/>
-      </div>
-
-      <!-- Search results list -->
-      <div id="studentSearchResults"
-        style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border);border-radius:9px;display:none">
-      </div>
-
-      <!-- Selected student preview -->
-      <div id="selectedStudentPreview" style="display:none;margin-top:12px;
-        padding:11px 14px;background:var(--green-light);border:1px solid rgba(46,125,50,0.2);
-        border-radius:9px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:1.1rem">✅</span>
-        <div>
-          <div id="selectedStudentName" style="font-weight:600;font-size:0.88rem;color:var(--green)"></div>
-          <div id="selectedStudentEmail" style="font-size:0.75rem;color:var(--text3)"></div>
-        </div>
-      </div>
-
-      <div id="addStudentError" style="display:none;margin-top:10px;
-        padding:10px 13px;background:var(--critical-bg);border-radius:8px;
-        font-size:0.83rem;color:var(--critical)"></div>
+      <div class="form-group"><label class="form-label" for="newStudentName">Student Name</label><input type="text" id="newStudentName" class="form-input" placeholder="e.g. Santos, Maria" title="Student full name" aria-label="Student full name" aria-required="true"/></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('addStudentModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmAddStudent()" id="addStudentBtn" disabled
-        style="opacity:0.5">
-        Add Student
-      </button>
+      <button class="btn btn-primary" onclick="confirmAddStudent()">Add Student</button>
     </div>
   </div>
 </div>
@@ -287,6 +252,7 @@ async function renderClassStudents(classId) {
   document.getElementById('pageContent').innerHTML = loadingHTML();
   try {
     const all = await getStudentsWithGrades(classId);
+    window._cachedStudents = all; // cache for live search
     const filtered = sortStudents(
       searchTerm ? all.filter(s=>s.student_name.toLowerCase().includes(searchTerm.toLowerCase())) : all
     );
@@ -314,7 +280,7 @@ async function renderClassStudents(classId) {
           <div class="search-bar" style="width:250px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <label for="studentSearch" class="sr-only">Search students</label>
-            <input type="search" id="studentSearch" class="search-input" placeholder="Search student…" title="Search by name" aria-label="Search students" oninput="searchTerm=this.value;renderClassStudents('${classId}')" value="${searchTerm}"/>
+            <input type="search" id="studentSearch" class="search-input" placeholder="Search student…" title="Search by name" aria-label="Search students" oninput="handleStudentSearch(this.value,'${classId}')" value="${searchTerm}"/>
           </div>
           <button class="btn btn-primary" onclick="openAddStudent('${classId}')" title="Add student">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -412,158 +378,32 @@ function previewGrade() {
 }
 
 /* ── Modals ── */
-/* ── Add Student (search from registered users) ── */
-let selectedStudentForAdd = null;
-
 function openAddStudent(classId) {
-  currentClassId      = classId;
-  selectedStudentForAdd = null;
-
-  // Reset modal
-  const searchInput = document.getElementById('studentSearchInput');
-  const results     = document.getElementById('studentSearchResults');
-  const preview     = document.getElementById('selectedStudentPreview');
-  const errBox      = document.getElementById('addStudentError');
-  const addBtn      = document.getElementById('addStudentBtn');
-
-  if (searchInput) searchInput.value = '';
-  if (results)     { results.innerHTML = ''; results.style.display = 'none'; }
-  if (preview)     preview.style.display = 'none';
-  if (errBox)      errBox.style.display  = 'none';
-  if (addBtn)      { addBtn.disabled = true; addBtn.style.opacity = '0.5'; }
-
+  currentClassId = classId;
+  document.getElementById('newStudentName').value = '';
   document.getElementById('addStudentModal').classList.remove('hidden');
-  setTimeout(() => searchInput?.focus(), 100);
-}
-
-async function searchRegisteredStudents(query) {
-  const results  = document.getElementById('studentSearchResults');
-  const errBox   = document.getElementById('addStudentError');
-  if (errBox) errBox.style.display = 'none';
-
-  if (!query || query.trim().length < 2) {
-    results.style.display = 'none';
-    results.innerHTML = '';
-    return;
-  }
-
-  results.style.display = 'block';
-  results.innerHTML = `<div style="padding:12px 14px;font-size:0.82rem;color:var(--text3)">Searching…</div>`;
-
-  try {
-    // Get all registered students from users + pending_users
-    const [usersSnap, pendingSnap] = await Promise.all([
-      db.collection('users').where('role','==','student').get(),
-      db.collection('pending_users').where('role','==','student').get()
-    ]);
-
-    const q = query.toLowerCase().trim();
-    const allStudents = [
-      ...usersSnap.docs.map(d => ({ id:d.id, source:'users', ...d.data() })),
-      ...pendingSnap.docs.map(d => ({ id:d.id, source:'pending', ...d.data() }))
-    ].filter(s =>
-      (s.name  || '').toLowerCase().includes(q) ||
-      (s.email || '').toLowerCase().includes(q)
-    );
-
-    if (!allStudents.length) {
-      results.innerHTML = `
-        <div style="padding:14px;text-align:center;font-size:0.82rem;color:var(--text3)">
-          No registered students found for "<strong>${query}</strong>"
-          <div style="margin-top:6px;font-size:0.77rem">Make sure the student is registered in the system first.</div>
-        </div>`;
-      return;
-    }
-
-    // Get already-enrolled students to prevent duplicates
-    const enrolledSnap = await db.collection('enrollments')
-      .where('class_id','==', currentClassId).get();
-    const enrolledEmails = new Set(
-      enrolledSnap.docs.map(d => (d.data().student_email||'').toLowerCase())
-    );
-
-    results.innerHTML = allStudents.map(s => {
-      const alreadyIn = enrolledEmails.has((s.email||'').toLowerCase());
-      return `
-        <div onclick="${alreadyIn ? '' : `selectStudentForAdd('${s.id}','${(s.name||'').replace(/'/g,"\\'")}','${s.email||''}')`}"
-          style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:${alreadyIn?'not-allowed':'pointer'};
-            display:flex;align-items:center;justify-content:space-between;
-            background:${alreadyIn?'var(--bg3)':'var(--surface)'};
-            transition:background 0.15s"
-          onmouseover="if(!${alreadyIn}) this.style.background='var(--surface2)'"
-          onmouseout="if(!${alreadyIn}) this.style.background='var(--surface)'">
-          <div>
-            <div style="font-size:0.86rem;font-weight:600;color:${alreadyIn?'var(--text3)':'var(--text)'}">${s.name||'—'}</div>
-            <div style="font-size:0.74rem;color:var(--text3)">${s.email||''} ${s.source==='pending'?'<span style="color:var(--moderate)">(pending login)</span>':''}</div>
-          </div>
-          ${alreadyIn
-            ? `<span style="font-size:0.72rem;color:var(--slight);background:var(--slight-bg);padding:2px 8px;border-radius:999px">Already enrolled</span>`
-            : `<span style="font-size:0.72rem;color:var(--green)">➕ Select</span>`
-          }
-        </div>`;
-    }).join('');
-
-  } catch(err) {
-    results.innerHTML = `<div style="padding:12px 14px;font-size:0.82rem;color:var(--critical)">Error: ${err.message}</div>`;
-  }
-}
-
-function selectStudentForAdd(studentId, studentName, studentEmail) {
-  selectedStudentForAdd = { id:studentId, name:studentName, email:studentEmail };
-
-  // Show preview
-  document.getElementById('selectedStudentName').textContent  = studentName;
-  document.getElementById('selectedStudentEmail').textContent = studentEmail;
-  const preview = document.getElementById('selectedStudentPreview');
-  preview.style.display = 'flex';
-
-  // Enable Add button
-  const addBtn = document.getElementById('addStudentBtn');
-  addBtn.disabled = false;
-  addBtn.style.opacity = '1';
-
-  // Clear search results
-  document.getElementById('studentSearchResults').style.display = 'none';
-  document.getElementById('studentSearchInput').value = studentName;
+  setTimeout(()=>document.getElementById('newStudentName').focus(),100);
 }
 
 async function confirmAddStudent() {
-  if (!selectedStudentForAdd) {
-    document.getElementById('addStudentError').style.display = 'block';
-    document.getElementById('addStudentError').textContent = 'Please select a student from the search results.';
-    return;
-  }
-
-  const addBtn = document.getElementById('addStudentBtn');
-  addBtn.disabled = true;
-  addBtn.textContent = 'Adding…';
-
+  const name = document.getElementById('newStudentName').value.trim();
+  if (!name) { showToast('Please enter a student name.','error'); return; }
   try {
     await db.collection('enrollments').add({
-      student_name:  selectedStudentForAdd.name,
-      student_email: selectedStudentForAdd.email,
-      class_id:      currentClassId,
-      class_name:    currentClassData?.name    || '',
-      subject_name:  currentClassData?.subject || '',
-      enrolled_by:   currentUser.uid,
-      enrolled_at:   firebase.firestore.FieldValue.serverTimestamp()
+      student_name: name,
+      class_id:     currentClassId,
+      class_name:   currentClassData?.name || '',
+      subject_name: currentClassData?.subject || '',
+      enrolled_by:  currentUser.uid,
+      enrolled_at:  firebase.firestore.FieldValue.serverTimestamp()
     });
-
     await db.collection('classes').doc(currentClassId).update({
       students: firebase.firestore.FieldValue.increment(1)
     });
-
     closeModal('addStudentModal');
-    showToast(`${selectedStudentForAdd.name} added successfully.`);
+    showToast(`${name} added successfully.`);
     renderClassStudents(currentClassId);
-
-  } catch(err) {
-    document.getElementById('addStudentError').style.display = 'block';
-    document.getElementById('addStudentError').textContent = 'Failed to add student: ' + err.message;
-    addBtn.disabled = false;
-    addBtn.style.opacity = '1';
-    addBtn.textContent = 'Add Student';
-  }
+  } catch(err) { showToast('Failed to add student: '+err.message,'error'); }
 }
 
 function openEditGrade(enrollmentId, studentName, gradeDocId, midterm, finals) {
@@ -647,6 +487,41 @@ async function confirmDelete() {
   } catch(err) { showToast('Failed to remove student: '+err.message,'error'); }
 }
 
+function handleStudentSearch(value, classId) {
+  searchTerm = value;
+  // Only update the table rows — don't re-render the whole page (preserves input focus)
+  const tbody = document.querySelector('.data-table tbody');
+  if (!tbody) return;
+
+  const studs = window._cachedStudents || [];
+  const filtered = sortStudents(
+    value.trim()
+      ? studs.filter(s => s.student_name.toLowerCase().includes(value.toLowerCase()))
+      : studs
+  );
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-title">No students found</div></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(s => `<tr>
+    <td>${s.student_name}</td>
+    <td>${s.has_grade ? `<strong style="color:${s.avg>=75?'var(--text)':'var(--critical)'}">${s.avg.toFixed(1)}%</strong>` : '<span style="color:var(--text3);font-size:0.8rem">Not yet encoded</span>'}</td>
+    <td>${s.has_grade ? `<span style="font-size:0.78rem;color:var(--text3)">${s.midterm}% / ${s.finals}%</span>` : '—'}</td>
+    <td>${s.has_grade ? riskBadge(computeRisk(s.avg)) : '—'}</td>
+    <td>
+      <div class="action-btns">
+        <button class="action-btn" title="Encode grades for ${s.student_name}" aria-label="Encode grades for ${s.student_name}" onclick="openEditGrade('${s.enrollment_id}','${s.student_name.replace(/'/g,"\\'")}','${s.grade_doc_id||''}',${s.midterm||0},${s.finals||0})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="action-btn delete" title="Remove ${s.student_name}" aria-label="Remove student ${s.student_name}" onclick="openDelete('${s.enrollment_id}','${s.student_name.replace(/'/g,"\\'")}','${s.grade_doc_id||''}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function setTopbar(t,b) { document.getElementById('topbarTitle').textContent=t; document.getElementById('topbarBreadcrumb').textContent=b; }
 function loadingHTML() { return `<div style="display:flex;align-items:center;justify-content:center;height:40vh"><div class="spinner" style="width:30px;height:30px;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div></div>`; }
