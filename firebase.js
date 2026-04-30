@@ -5,7 +5,7 @@
 
 const firebaseConfig = {
   apiKey:            "AIzaSyB1He8fcUvvCBGnIX2igkwSJa20E8yzlNw",
-  authDomain:        "edutrack-ai-9debc.firebaseapp.com",
+  authDomain:        "edutrack-ai-seven.vercel.app",
   projectId:         "edutrack-ai-9debc",
   storageBucket:     "edutrack-ai-9debc.firebasestorage.app",
   messagingSenderId: "614727970428",
@@ -18,5 +18,5 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-// Keep user logged in for the browser session only
-auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+// Use LOCAL persistence so mobile users stay logged in
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
