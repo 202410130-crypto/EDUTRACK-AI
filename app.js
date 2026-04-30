@@ -55,13 +55,9 @@ function togglePassword() {
 }
 
 /* =============================================
-   GOOGLE SIGN-IN (Primary login method)
-   Uses popup on desktop, redirect on mobile
+   GOOGLE SIGN-IN
+   Uses signInWithPopup for all devices
    ============================================= */
-function isMobile() {
-  return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
-}
-
 async function handleGoogleLogin() {
   clearLoginError();
   const btn     = document.getElementById('googleBtn');
@@ -77,41 +73,40 @@ async function handleGoogleLogin() {
   });
 
   try {
-    if (isMobile()) {
-      // Mobile: use redirect (popup blocked on most mobile browsers)
-      await auth.signInWithRedirect(provider);
-      // Page will redirect to Google then come back — result handled in DOMContentLoaded
-    } else {
-      // Desktop: use popup
-      const result = await auth.signInWithPopup(provider);
-      await handleAuthResult(result.user);
-    }
+    const result = await auth.signInWithPopup(provider);
+    await handleAuthResult(result.user);
   } catch (err) {
     console.error('Google login error:', err.code, err.message);
-    if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+
+    if (err.code === 'auth/popup-closed-by-user' ||
+        err.code === 'auth/cancelled-popup-request') {
       if (btn)     btn.disabled = false;
       if (btnText) btnText.textContent = 'Sign in with Google';
       return;
     }
-    const msg = err.code === 'auth/popup-blocked'
-      ? 'Popup was blocked. Please allow popups or use a different browser.'
-      : err.code === 'auth/network-request-failed'
-      ? 'Network error. Please check your internet connection.'
-      : 'Sign-in failed. Please try again.';
+
+    const msg =
+      err.code === 'auth/popup-blocked'
+        ? 'Popup was blocked. Please allow popups for this site in your browser settings.'
+        : err.code === 'auth/network-request-failed'
+        ? 'Network error. Please check your internet connection and try again.'
+        : err.code === 'auth/internal-error'
+        ? 'Authentication error. Please clear your browser cache and try again.'
+        : 'Sign-in failed. Please try again.';
+
     showLoginError(msg);
     if (btn)     btn.disabled = false;
     if (btnText) btnText.textContent = 'Sign in with Google';
   }
 }
 
-/* Handle auth result — shared by popup and redirect ── */
+/* ── Handle auth result ── */
 async function handleAuthResult(firebaseUser) {
   const btn     = document.getElementById('googleBtn');
   const btnText = document.getElementById('googleBtnText');
 
   const email = firebaseUser.email;
 
-  // Domain restriction
   if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
     await auth.signOut();
     showLoginError(`Access denied. Only @${ALLOWED_DOMAIN} accounts are allowed. You signed in with: ${email}`);
@@ -120,7 +115,6 @@ async function handleAuthResult(firebaseUser) {
     return;
   }
 
-  // Check registration
   const userData = await getUserData(firebaseUser);
   if (!userData) {
     await auth.signOut();
@@ -130,7 +124,6 @@ async function handleAuthResult(firebaseUser) {
     return;
   }
 
-  // Redirect to dashboard
   window.location.href = ROLE_REDIRECTS[userData.role] || 'index.html';
 }
 
@@ -327,33 +320,13 @@ function populateSidebar(user) {
   }
 }
 
-/* ── Enter key + redirect result handler ── */
+/* ── Enter key + auto-redirect if already signed in ── */
 document.addEventListener('DOMContentLoaded', () => {
   const pw = document.getElementById('passwordInput');
   const em = document.getElementById('emailInput');
   if (pw) pw.addEventListener('keydown', e => { if (e.key === 'Enter') handleEmailLogin(); });
   if (em) em.addEventListener('keydown', e => { if (e.key === 'Enter') handleEmailLogin(); });
   if (em) em.addEventListener('input', clearLoginError);
-
-  // Handle redirect result (mobile Google Sign-In comes back here)
-  auth.getRedirectResult().then(async (result) => {
-    if (!result || !result.user) return;
-    const btn     = document.getElementById('googleBtn');
-    const btnText = document.getElementById('googleBtnText');
-    if (btn)     btn.disabled = true;
-    if (btnText) btnText.innerHTML = '<span class="spinner"></span> Signing in…';
-    try {
-      await handleAuthResult(result.user);
-    } catch(e) {
-      showLoginError('Sign-in failed. Please try again.');
-      if (btn)     btn.disabled = false;
-      if (btnText) btnText.textContent = 'Sign in with Google';
-    }
-  }).catch((err) => {
-    if (err.code !== 'auth/no-such-provider') {
-      console.error('Redirect result error:', err);
-    }
-  });
 
   // If already signed in — redirect immediately
   auth.onAuthStateChanged(async (fbUser) => {
