@@ -358,7 +358,7 @@ function computeRisk(avg) {
 }
 function computeStatus(avg) {
   if (avg >= 75) return 'Passing';
-  if (avg >= 70) return 'Conditional Passing';
+  if (avg >= 74.5) return 'Conditional Passing';
   return 'Failing';
 }
 function sortStudents(arr) {
