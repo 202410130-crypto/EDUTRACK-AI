@@ -109,6 +109,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="firebase.js"></script>
 <script src="app.js"></script>
 <script>
@@ -252,7 +254,6 @@ async function renderClassStudents(classId) {
   document.getElementById('pageContent').innerHTML = loadingHTML();
   try {
     const all = await getStudentsWithGrades(classId);
-    window._cachedStudents = all; // cache for live search
     const filtered = sortStudents(
       searchTerm ? all.filter(s=>s.student_name.toLowerCase().includes(searchTerm.toLowerCase())) : all
     );
@@ -280,7 +281,7 @@ async function renderClassStudents(classId) {
           <div class="search-bar" style="width:250px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <label for="studentSearch" class="sr-only">Search students</label>
-            <input type="search" id="studentSearch" class="search-input" placeholder="Search student…" title="Search by name" aria-label="Search students" oninput="handleStudentSearch(this.value,'${classId}')" value="${searchTerm}"/>
+            <input type="search" id="studentSearch" class="search-input" placeholder="Search student…" title="Search by name" aria-label="Search students" oninput="searchTerm=this.value;renderClassStudents('${classId}')" value="${searchTerm}"/>
           </div>
           <button class="btn btn-primary" onclick="openAddStudent('${classId}')" title="Add student">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -298,7 +299,7 @@ async function renderClassStudents(classId) {
 /* ── Reports View ── */
 async function renderReportsView() {
   setTopbar('Risk Reports','Teacher Dashboard');
-  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="alert('Report exported!')" title="Export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>`;
+  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="exportReportPDF()" title="Export PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button>`;
   document.getElementById('pageContent').innerHTML = loadingHTML();
 
   try {
@@ -487,44 +488,135 @@ async function confirmDelete() {
   } catch(err) { showToast('Failed to remove student: '+err.message,'error'); }
 }
 
-function handleStudentSearch(value, classId) {
-  searchTerm = value;
-  // Only update the table rows — don't re-render the whole page (preserves input focus)
-  const tbody = document.querySelector('.data-table tbody');
-  if (!tbody) return;
-
-  const studs = window._cachedStudents || [];
-  const filtered = sortStudents(
-    value.trim()
-      ? studs.filter(s => s.student_name.toLowerCase().includes(value.toLowerCase()))
-      : studs
-  );
-
-  if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-title">No students found</div></div></td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = filtered.map(s => `<tr>
-    <td>${s.student_name}</td>
-    <td>${s.has_grade ? `<strong style="color:${s.avg>=75?'var(--text)':'var(--critical)'}">${s.avg.toFixed(1)}%</strong>` : '<span style="color:var(--text3);font-size:0.8rem">Not yet encoded</span>'}</td>
-    <td>${s.has_grade ? `<span style="font-size:0.78rem;color:var(--text3)">${s.midterm}% / ${s.finals}%</span>` : '—'}</td>
-    <td>${s.has_grade ? riskBadge(computeRisk(s.avg)) : '—'}</td>
-    <td>
-      <div class="action-btns">
-        <button class="action-btn" title="Encode grades for ${s.student_name}" aria-label="Encode grades for ${s.student_name}" onclick="openEditGrade('${s.enrollment_id}','${s.student_name.replace(/'/g,"\\'")}','${s.grade_doc_id||''}',${s.midterm||0},${s.finals||0})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button class="action-btn delete" title="Remove ${s.student_name}" aria-label="Remove student ${s.student_name}" onclick="openDelete('${s.enrollment_id}','${s.student_name.replace(/'/g,"\\'")}','${s.grade_doc_id||''}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-        </button>
-      </div>
-    </td>
-  </tr>`).join('');
-}
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function setTopbar(t,b) { document.getElementById('topbarTitle').textContent=t; document.getElementById('topbarBreadcrumb').textContent=b; }
 function loadingHTML() { return `<div style="display:flex;align-items:center;justify-content:center;height:40vh"><div class="spinner" style="width:30px;height:30px;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div></div>`; }
+
+/* =============================================
+   PDF EXPORT FUNCTIONS
+   ============================================= */
+function buildPDF(title, subtitle, columns, rows, filename) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const now = new Date().toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
+
+  // Header background
+  doc.setFillColor(26, 53, 32);
+  doc.rect(0, 0, 210, 28, 'F');
+
+  // Logo text
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('EduTrack AI', 14, 11);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(180, 220, 180);
+  doc.text('Academic Risk & Performance Monitor — Gordon College', 14, 17);
+  doc.text(`Generated: ${now}`, 14, 23);
+
+  // Title
+  doc.setTextColor(26, 53, 32);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text(title, 14, 38);
+
+  if (subtitle) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text(subtitle, 14, 45);
+  }
+
+  // Table
+  doc.autoTable({
+    head: [columns],
+    body: rows,
+    startY: subtitle ? 50 : 44,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [46, 125, 50],
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 9
+    },
+    bodyStyles: { fontSize: 8.5, textColor: [30, 30, 30] },
+    alternateRowStyles: { fillColor: [240, 248, 240] },
+    columnStyles: { 0: { cellWidth: 55 } },
+    margin: { left: 14, right: 14 }
+  });
+
+  // Footer
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(`EduTrack AI — Confidential | Page ${i} of ${pageCount}`, 14, 290);
+  }
+
+  doc.save(filename);
+  showToast('PDF exported successfully!');
+}
+
+async function exportReportPDF() {
+  showToast('Generating PDF…');
+  try {
+    const classSnap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
+    const classes   = classSnap.docs.map(d => ({id:d.id,...d.data()}));
+
+    const rows = [];
+    for (const c of classes) {
+      const studs = await getStudentsWithGrades(c.id);
+      studs.filter(s => s.has_grade).forEach(s => {
+        rows.push([
+          s.student_name,
+          c.name,
+          s.avg.toFixed(1) + '%',
+          computeRisk(s.avg),
+          computeStatus(s.avg)
+        ]);
+      });
+    }
+
+    if (!rows.length) { showToast('No grade data to export yet.', 'error'); return; }
+
+    rows.sort((a,b) => a[0].localeCompare(b[0]));
+
+    buildPDF(
+      'Academic Risk Report',
+      `Teacher: ${currentUser.name} | ${new Date().toLocaleDateString('en-PH')}`,
+      ['Student Name', 'Class', 'Average', 'Risk Level', 'Status'],
+      rows,
+      `EduTrack_Risk_Report_${Date.now()}.pdf`
+    );
+  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
+}
+
+async function exportClassStudentsPDF() {
+  if (!currentClassId || !currentClassData) return;
+  showToast('Generating PDF…');
+  try {
+    const studs = await getStudentsWithGrades(currentClassId);
+    const sorted = [...studs].sort((a,b) => a.student_name.localeCompare(b.student_name));
+    const rows = sorted.map(s => [
+      s.student_name,
+      s.has_grade ? s.midterm + '%' : '—',
+      s.has_grade ? s.finals  + '%' : '—',
+      s.has_grade ? s.avg.toFixed(1) + '%' : '—',
+      s.has_grade ? computeRisk(s.avg) : '—',
+      s.has_grade ? computeStatus(s.avg) : '—'
+    ]);
+
+    buildPDF(
+      `Class Report — ${currentClassData.name}`,
+      `Subject: ${currentClassData.subject} | Professor: ${currentUser.name}`,
+      ['Student Name', 'Midterm', 'Finals', 'Average', 'Risk Level', 'Status'],
+      rows,
+      `EduTrack_${currentClassData.name.replace(/\s/g,'_')}_${Date.now()}.pdf`
+    );
+  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
+}
 </script>
 </body>
 </html>
