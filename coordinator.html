@@ -50,6 +50,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="firebase.js"></script>
 <script src="app.js"></script>
 <script>
@@ -218,8 +220,8 @@ async function renderClassStudents(classId) {
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Students — ${sorted.length} (A–Z)</span>
-          <button class="btn btn-primary" onclick="alert('Report exported!')" title="Export">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export
+          <button class="btn btn-primary" onclick="exportClassReportPDF('${classId}','${(currentClass?.name||'').replace(/'/g,"\\'")}','${(currentClass?.subject||'').replace(/'/g,"\\'")}'')" title="Export PDF">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF
           </button>
         </div>
         <table class="data-table" aria-label="Students sorted alphabetically">
@@ -234,7 +236,7 @@ async function renderClassStudents(classId) {
 async function renderReports() {
   document.getElementById('topbarTitle').textContent = 'Risk Reports';
   document.getElementById('topbarBreadcrumb').textContent = 'Program Coordinator Dashboard';
-  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="alert('Reports exported!')" title="Export all">Export All</button>`;
+  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="exportAllReportsPDF()" title="Export all as PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button>`;
   document.getElementById('pageContent').innerHTML = loadingHTML();
 
   try {
@@ -269,6 +271,119 @@ function countRiskFromGrades(grades) {
     else if(r==='Moderately At Risk') a.moderate++; else a.critical++;
     return a;
   },{safe:0,slight:0,moderate:0,critical:0});
+}
+
+/* =============================================
+   PDF EXPORT
+   ============================================= */
+function buildPDF(title, subtitle, columns, rows, filename) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const now = new Date().toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
+
+  // Header
+  doc.setFillColor(26, 53, 32);
+  doc.rect(0, 0, 210, 28, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+  doc.text('EduTrack AI', 14, 11);
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.setTextColor(180, 220, 180);
+  doc.text('Academic Risk & Performance Monitor — Gordon College', 14, 17);
+  doc.text(`Generated: ${now}`, 14, 23);
+
+  // Title
+  doc.setTextColor(26, 53, 32);
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text(title, 14, 38);
+  if (subtitle) {
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text(subtitle, 14, 45);
+  }
+
+  doc.autoTable({
+    head: [columns],
+    body: rows,
+    startY: subtitle ? 50 : 44,
+    theme: 'grid',
+    headStyles: { fillColor:[46,125,50], textColor:255, fontStyle:'bold', fontSize:9 },
+    bodyStyles: { fontSize:8.5, textColor:[30,30,30] },
+    alternateRowStyles: { fillColor:[240,248,240] },
+    columnStyles: { 0: { cellWidth: 60 } },
+    margin: { left:14, right:14 }
+  });
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(150);
+    doc.text(`EduTrack AI — Confidential | Page ${i} of ${pageCount}`, 14, 290);
+  }
+  doc.save(filename);
+  showToast('PDF exported successfully!');
+}
+
+async function exportAllReportsPDF() {
+  showToast('Generating PDF…');
+  try {
+    const gSnap = await db.collection('grades').get();
+    const rows  = gSnap.docs
+      .map(d => d.data())
+      .sort((a,b) => (a.student_name||'').localeCompare(b.student_name||''))
+      .map(g => [
+        g.student_name || '—',
+        g.class_name   || g.subject_name || '—',
+        (g.average_grade||0).toFixed(1) + '%',
+        computeRisk(g.average_grade||0),
+        computeStatus(g.average_grade||0)
+      ]);
+
+    if (!rows.length) { showToast('No grade data to export yet.', 'error'); return; }
+
+    buildPDF(
+      'Academic Risk Report — All Classes',
+      `Program Coordinator Report | ${new Date().toLocaleDateString('en-PH')}`,
+      ['Student Name', 'Class', 'Average', 'Risk Level', 'Status'],
+      rows,
+      `EduTrack_All_Classes_Report_${Date.now()}.pdf`
+    );
+  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
+}
+
+async function exportClassReportPDF(classId, className, subject) {
+  showToast('Generating PDF…');
+  try {
+    const [eSnap, gSnap] = await Promise.all([
+      db.collection('enrollments').where('class_id','==',classId).get(),
+      db.collection('grades').where('class_id','==',classId).get()
+    ]);
+    const gradesMap = {};
+    gSnap.docs.forEach(d => { gradesMap[d.data().enrollment_id] = d.data(); });
+
+    const rows = eSnap.docs
+      .map(d => {
+        const e = d.data();
+        const g = gradesMap[d.id];
+        return [
+          e.student_name || '—',
+          g ? g.midterm_grade + '%' : '—',
+          g ? g.finals_grade  + '%' : '—',
+          g ? g.average_grade.toFixed(1) + '%' : '—',
+          g ? computeRisk(g.average_grade) : '—',
+          g ? computeStatus(g.average_grade) : '—'
+        ];
+      })
+      .sort((a,b) => a[0].localeCompare(b[0]));
+
+    buildPDF(
+      `Class Report — ${className}`,
+      `Subject: ${subject}`,
+      ['Student Name', 'Midterm', 'Finals', 'Average', 'Risk Level', 'Status'],
+      rows,
+      `EduTrack_${className.replace(/\s/g,'_')}_${Date.now()}.pdf`
+    );
+  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
 }
 </script>
 </body>
