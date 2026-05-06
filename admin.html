@@ -515,7 +515,11 @@ async function renderUsers() {
             ${active.length} active &nbsp;·&nbsp; ${pending.length} pending first login
           </span>
         </div>
-        <table class="data-table" aria-label="All registered users">
+        <div class="scroll-hint">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  Swipe to see more
+</div>
+<div class="table-scroll-wrap"><table class="data-table" aria-label="All registered users">
           <thead>
             <tr>
               <th scope="col">Name</th>
@@ -527,7 +531,7 @@ async function renderUsers() {
             </tr>
           </thead>
           <tbody>${rows}</tbody>
-        </table>
+        </table></div>
       </div>`;
 
   } catch (err) {
@@ -783,7 +787,11 @@ async function renderOverview() {
           <span class="panel-title">Class Assignments</span>
           <span style="font-size:0.75rem;color:var(--green);background:var(--green-light);padding:3px 10px;border-radius:999px;font-weight:600">🔒 @${DOMAIN} only</span>
         </div>
-        <table class="data-table" aria-label="Class overview">
+        <div class="scroll-hint">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  Swipe to see more
+</div>
+<div class="table-scroll-wrap"><table class="data-table" aria-label="Class overview">
           <thead>
             <tr>
               <th scope="col">Class</th>
@@ -802,7 +810,7 @@ async function renderOverview() {
               <td>${c.students||0}</td>
             </tr>`).join('')}
           </tbody>
-        </table>
+        </table></div>
       </div>`;
   } catch(err) {
     document.getElementById('pageContent').innerHTML = `
