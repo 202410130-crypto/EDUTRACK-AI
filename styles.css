@@ -736,3 +736,36 @@ ul { list-style: none; }
   .topbar { padding: 12px 14px; }
   .stats-row { grid-template-columns: 1fr 1fr; gap: 9px; }
 }
+
+/* ── Mobile sidebar overlay & hamburger ── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 9;
+}
+.sidebar-overlay.show { display: block; }
+
+.hamburger-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  color: var(--text2);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.hamburger-btn:hover { background: var(--surface2); color: var(--text); }
+.hamburger-btn svg { width: 18px; height: 18px; }
+
+@media (max-width: 680px) {
+  .hamburger-btn { display: flex; }
+  .sidebar { z-index: 10; }
+  .topbar-left { display: flex; align-items: center; gap: 10px; }
+}
