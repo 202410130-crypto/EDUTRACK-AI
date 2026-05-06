@@ -183,7 +183,11 @@ function renderOverview() {
     </div>
     <div class="panel">
       <div class="panel-header"><span class="panel-title">Detailed Grades</span></div>
-      <table class="data-table" aria-label="Grades by subject">
+      <div class="scroll-hint" style="display:flex;align-items:center;justify-content:flex-end;gap:4px;font-size:0.7rem;color:var(--text3);padding:3px 14px 5px">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  Swipe to see more
+</div>
+<div class="table-scroll-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%"><table class="data-table" style="min-width:480px" aria-label="Grades by subject">
         <thead><tr><th scope="col">Subject</th><th scope="col">Average</th><th scope="col">Risk Level</th><th scope="col">Status</th></tr></thead>
         <tbody>
           ${studentSubjects.map(s=>`<tr>
@@ -193,7 +197,7 @@ function renderOverview() {
             <td>${statusBadge(computeStatus(s.avg))}</td>
           </tr>`).join('')}
         </tbody>
-      </table>
+      </table></div>
     </div>`;
 }
 
