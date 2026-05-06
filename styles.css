@@ -769,3 +769,59 @@ ul { list-style: none; }
   .sidebar { z-index: 10; }
   .topbar-left { display: flex; align-items: center; gap: 10px; }
 }
+/* =============================================
+   SWIPEABLE TABLE — MOBILE
+   ============================================= */
+.table-scroll-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.table-scroll-wrap .data-table {
+  min-width: 580px;
+}
+.scroll-hint {
+  display: none;
+  font-size: 0.7rem;
+  color: var(--text3);
+  text-align: right;
+  padding: 3px 14px 5px;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.scroll-hint svg { width: 12px; height: 12px; }
+@media (max-width: 680px) {
+  .scroll-hint { display: flex; }
+  .table-scroll-wrap .data-table { min-width: 520px; }
+}
+ 
+/* =============================================
+   FILTER CHIPS — EXPORT MODAL
+   ============================================= */
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.chip {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  transition: var(--transition);
+  user-select: none;
+}
+.chip:hover { border-color: var(--green); color: var(--green); background: var(--green-light); }
+.chip.active {
+  border-color: var(--green);
+  background: var(--green-light);
+  color: var(--green);
+  font-weight: 700;
+}
