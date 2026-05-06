@@ -14,7 +14,7 @@
 </head>
 <body class="dash-body">
 
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
     <img src="logo.png" alt="EduTrack AI" class="sidebar-logo-img"/>
     <div><span class="sidebar-logo-text">EduTrack <em>AI</em></span><span class="sidebar-logo-sub">Academic Monitor</span></div>
@@ -61,11 +61,23 @@
   </div>
 </aside>
 
+<!-- Mobile sidebar overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
 <div class="main-content">
   <header class="topbar">
     <div class="topbar-left">
-      <h2 id="topbarTitle">Classes</h2>
-      <div class="breadcrumb" id="topbarBreadcrumb">Admin Dashboard</div>
+      <button class="hamburger-btn" onclick="toggleSidebar()" title="Open menu" aria-label="Open navigation menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <div>
+        <h2 id="topbarTitle">Classes</h2>
+        <div class="breadcrumb" id="topbarBreadcrumb">Admin Dashboard</div>
+      </div>
     </div>
     <div class="topbar-right" id="topbarRight"></div>
   </header>
@@ -258,10 +270,26 @@ function renderRegisterUser() {
                 <select id="regProgram" class="form-select" title="Program" aria-label="Degree program">
                   <option value="BSCS">BSCS</option>
                   <option value="BSIT">BSIT</option>
-                  <option value="BSIS">BSIS</option>
+                  <option value="BSEMC-GD">BSEMC-GD</option>
+                  <option value="BSEMC-DA">BSEMC-DA</option>
                   <option value="BSN">BSN</option>
+                  <option value="BSM">BSM</option>
+                  <option value="BSA">BSA</option>
+                  <option value="BSCA">BSCA</option>
+                  <option value="BSBA-FM">BSBA-FM</option>
+                  <option value="BSBA-MM">BSBA-MM</option>
+                  <option value="BSHM">BSHM</option>
+                  <option value="BSTM">BSTM</option>
+                  <option value="BPED">BPED</option>
                   <option value="BSED">BSED</option>
-                  <option value="BSBA">BSBA</option>
+                  <option value="BSED-ENGLISH">BSED-ENGLISH</option>
+                  <option value="BSED-MATH">BSED-MATH</option>
+                  <option value="BSED-FILIPINO">BSED-FILIPINO</option>
+                  <option value="BSED-SOCIAL STUDIES">BSED-SOCIAL STUDIES</option>
+                  <option value="BSED-SCIENCE">BSED-SCIENCE</option>
+                  <option value="BECED">BECED</option>
+                  <option value="BACOMM">BACOMM</option>
+                  <option value="BCAED">BCAED</option>
                 </select>
               </div>
               <div class="form-group">
@@ -286,9 +314,14 @@ function renderRegisterUser() {
           <div id="staffFields" style="display:none">
             <div class="form-group">
               <label class="form-label" for="regDept">Department</label>
-              <input type="text" id="regDept" class="form-input"
-                placeholder="e.g. CCS Faculty"
-                title="Department" aria-label="Department"/>
+              <select id="regDept" class="form-select" title="Department" aria-label="Department">
+                <option value="CCS">CCS</option>
+                <option value="CBA">CBA</option>
+                <option value="CAHS">CAHS</option>
+                <option value="CEAS">CEAS</option>
+                <option value="CHTM">CHTM</option>
+              </select>
+
             </div>
           </div>
 
@@ -781,6 +814,23 @@ async function renderOverview() {
 }
 
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebarOverlay')?.classList.remove('show');
+}
+// Close sidebar when a nav link is clicked on mobile
+document.querySelectorAll('.nav-link').forEach(l => {
+  l.addEventListener('click', () => {
+    if (window.innerWidth <= 680) closeSidebar();
+  });
+});
 </script>
 </body>
 </html>
