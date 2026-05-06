@@ -337,10 +337,12 @@ function openMyGrade(enrollId, studentName, gradeDocId, midterm, finals) {
 }
 
 function previewMyGrade() {
-  const m = parseFloat(document.getElementById('myGradeMidterm').value)||0;
-  const f = parseFloat(document.getElementById('myGradeFinals').value)||0;
-  if (!m&&!f) { document.getElementById('myGradePreview').style.display='none'; return; }
-  const avg  = ((m+f)/2);
+  const m = parseFloat(document.getElementById('myGradeMidterm').value);
+  const fRaw = document.getElementById('myGradeFinals').value.trim();
+  const f = fRaw !== '' ? parseFloat(fRaw) : null;
+  if (isNaN(m)) { document.getElementById('myGradePreview').style.display='none'; return; }
+  const hasFinals = f !== null && !isNaN(f);
+  const avg  = hasFinals ? (m+f)/2 : m;
   const risk = computeRisk(avg);
   const colors = {Safe:'var(--safe)','Slightly At Risk':'var(--slight)','Moderately At Risk':'var(--moderate)','Critically At Risk':'var(--critical)'};
   document.getElementById('myGradePreview').style.display='block';
@@ -348,23 +350,31 @@ function previewMyGrade() {
     <div style="display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--bg3);border-radius:9px;border:1px solid var(--border)">
       <div style="font-size:1.3rem;font-weight:800;color:${colors[risk]};font-family:'Syne',sans-serif">${avg.toFixed(1)}%</div>
       <div>${riskBadge(risk)}</div>
-      <div style="font-size:0.78rem;color:var(--text3)">Average of ${m}% + ${f}%</div>
-    </div>`;
+    </div>
+    ${!hasFinals ? `<div style="font-size:0.75rem;color:var(--text3);margin-top:5px">⚠ Finals not yet encoded. Risk based on Midterm only.</div>` : ''}`;
 }
 
 async function saveMyGrade() {
-  const enrollId = document.getElementById('myGradeEnrollId').value;
+  const enrollId   = document.getElementById('myGradeEnrollId').value;
   const gradeDocId = document.getElementById('myGradeDocId').value;
-  const midterm = parseFloat(document.getElementById('myGradeMidterm').value)||0;
-  const finals  = parseFloat(document.getElementById('myGradeFinals').value)||0;
-  const avg     = (midterm+finals)/2;
+  const midterm    = parseFloat(document.getElementById('myGradeMidterm').value);
+  const fRaw       = document.getElementById('myGradeFinals').value.trim();
+  const finals     = fRaw !== '' ? parseFloat(fRaw) : null;
+
+  if (isNaN(midterm)||midterm<0||midterm>100) { showToast('Enter a valid Midterm grade (0–100).','error'); return; }
+  if (finals !== null && (isNaN(finals)||finals<0||finals>100)) { showToast('Finals must be 0–100.','error'); return; }
+
+  const hasFinals = finals !== null;
+  const avg = hasFinals ? (midterm+finals)/2 : midterm;
   const enrollSnap = await db.collection('enrollments').doc(enrollId).get();
   const e = enrollSnap.data();
+
   const gradeData = {
     enrollment_id: enrollId, class_id: currentTeachClassId,
     class_name: currentTeachClassData?.name||'', subject_name: currentTeachClassData?.subject||'',
     student_name: e.student_name||'', student_email: e.student_email||'',
-    midterm_grade: midterm, finals_grade: finals, average_grade: avg,
+    midterm_grade: midterm, finals_grade: hasFinals ? finals : null,
+    has_finals: hasFinals, average_grade: avg,
     risk_level: computeRisk(avg), status: computeStatus(avg),
     encoded_by: currentUser.uid, updated_at: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -372,7 +382,7 @@ async function saveMyGrade() {
     if (gradeDocId) await db.collection('grades').doc(gradeDocId).update(gradeData);
     else await db.collection('grades').add({...gradeData, created_at: firebase.firestore.FieldValue.serverTimestamp()});
     document.getElementById('myGradeModal').classList.add('hidden');
-    showToast('Grades saved successfully!');
+    showToast(hasFinals ? 'Grades saved!' : 'Midterm saved. Finals can be added later.');
     renderMyClassStudents();
   } catch(err) { showToast('Failed to save: '+err.message,'error'); }
 }
@@ -791,14 +801,14 @@ document.querySelectorAll('.nav-link').forEach(l=>{
       <input type="hidden" id="myGradeDocId"/>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label" for="myGradeMidterm">Midterm Grade (%)</label>
+          <label class="form-label" for="myGradeMidterm">Midterm Grade (0–100) <span style="color:var(--critical);font-size:0.75rem">*required</span></label>
           <input type="number" id="myGradeMidterm" class="form-input" min="0" max="100"
             placeholder="e.g. 85" oninput="previewMyGrade()"/>
         </div>
         <div class="form-group">
-          <label class="form-label" for="myGradeFinals">Finals Grade (%)</label>
+          <label class="form-label" for="myGradeFinals">Finals Grade (0–100) <span style="color:var(--text3);font-size:0.75rem">optional</span></label>
           <input type="number" id="myGradeFinals" class="form-input" min="0" max="100"
-            placeholder="e.g. 90" oninput="previewMyGrade()"/>
+            placeholder="Leave blank if not yet" oninput="previewMyGrade()"/>
         </div>
       </div>
       <div id="myGradePreview" style="margin-top:10px"></div>
