@@ -288,10 +288,14 @@ async function renderClassStudents(classId) {
             Add Student
           </button>
         </div>
-        <table class="data-table" aria-label="Students sorted alphabetically">
+        <div class="scroll-hint">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  Swipe to see more
+</div>
+<div class="table-scroll-wrap"><table class="data-table" aria-label="Students sorted alphabetically">
           <thead><tr><th scope="col">Student Name</th><th scope="col">Average</th><th scope="col">Midterm / Finals</th><th scope="col">Risk Level</th><th scope="col">Actions</th></tr></thead>
           <tbody>${rows || '<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-title">No students yet</div></div></td></tr>'}</tbody>
-        </table>
+        </table></div>
       </div>`;
   } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
 }
@@ -299,7 +303,7 @@ async function renderClassStudents(classId) {
 /* ── Reports View ── */
 async function renderReportsView() {
   setTopbar('Risk Reports','Teacher Dashboard');
-  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="exportReportPDF()" title="Export PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button>`;
+  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="openExportFilter()" title="Export PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button>`;
   document.getElementById('pageContent').innerHTML = loadingHTML();
 
   try {
@@ -321,9 +325,13 @@ async function renderReportsView() {
       if (!items.length) return '';
       return `<div class="panel" style="margin-bottom:18px">
         <div class="panel-header"><span class="panel-title">${riskBadge(level)} — ${items.length} Student${items.length>1?'s':''}</span></div>
-        <table class="data-table"><thead><tr><th>Student</th><th>Class</th><th>Average</th><th>Risk</th></tr></thead>
+        <div class="scroll-hint">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  Swipe to see more
+</div>
+<div class="table-scroll-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Class</th><th>Average</th><th>Risk</th></tr></thead>
         <tbody>${items.map(s=>`<tr><td>${s.student_name}</td><td>${s.className}</td><td>${s.avg.toFixed(1)}%</td><td>${riskBadge(level)}</td></tr>`).join('')}</tbody>
-        </table></div>`;
+        </table></div></div>`;
     };
 
     const html = section('Critically At Risk','critical')+section('Moderately At Risk','moderate')+section('Slightly At Risk','slight')+section('Safe','safe');
@@ -559,64 +567,122 @@ function buildPDF(title, subtitle, columns, rows, filename) {
   showToast('PDF exported successfully!');
 }
 
-async function exportReportPDF() {
+async function exportReportPDF() { openExportFilter(); } // legacy alias
+
+/* ── Export Filter ── */
+let _exportClasses = [], _exportSelected = [];
+
+async function openExportFilter() {
+  const snap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
+  _exportClasses  = snap.docs.map(d=>({id:d.id,...d.data()}));
+  _exportSelected = _exportClasses.map(c=>c.id); // all selected by default
+
+  const chips = _exportClasses.map(c=>`
+    <button class="chip active" data-id="${c.id}"
+      onclick="toggleExportChip(this,'${c.id}')">
+      ${c.name} — ${c.subject||''}
+    </button>`).join('');
+
+  document.getElementById('exportFilterBody').innerHTML = `
+    <p style="font-size:0.84rem;color:var(--text2);margin-bottom:12px">
+      Choose which class(es) to include in the PDF:
+    </p>
+    <div class="chip-group">
+      <button class="chip active" id="chipAll" onclick="toggleAllExportChips(this)">✅ All Classes</button>
+      ${chips}
+    </div>`;
+
+  document.getElementById('exportFilterModal').classList.remove('hidden');
+}
+
+function toggleExportChip(el, id) {
+  el.classList.toggle('active');
+  _exportSelected = el.classList.contains('active')
+    ? [..._exportSelected, id]
+    : _exportSelected.filter(x=>x!==id);
+  const allChip = document.getElementById('chipAll');
+  if (allChip) allChip.classList.toggle('active', _exportSelected.length===_exportClasses.length);
+}
+
+function toggleAllExportChips(el) {
+  const activate = !el.classList.contains('active');
+  el.classList.toggle('active', activate);
+  _exportSelected = activate ? _exportClasses.map(c=>c.id) : [];
+  document.querySelectorAll('[data-id]').forEach(c=>c.classList.toggle('active', activate));
+}
+
+async function confirmExportPDF() {
+  if (!_exportSelected.length) { showToast('Select at least one class.','error'); return; }
+  closeModal('exportFilterModal');
   showToast('Generating PDF…');
   try {
-    const classSnap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
-    const classes   = classSnap.docs.map(d => ({id:d.id,...d.data()}));
-
+    const selected = _exportClasses.filter(c=>_exportSelected.includes(c.id));
     const rows = [];
-    for (const c of classes) {
+    for (const c of selected) {
       const studs = await getStudentsWithGrades(c.id);
-      studs.filter(s => s.has_grade).forEach(s => {
-        rows.push([
-          s.student_name,
-          c.name,
-          s.avg.toFixed(1) + '%',
-          computeRisk(s.avg),
-          computeStatus(s.avg)
-        ]);
-      });
+      studs.filter(s=>s.has_grade)
+        .sort((a,b)=>a.student_name.localeCompare(b.student_name))
+        .forEach(s=>{
+          rows.push([s.student_name, c.name, s.midterm+'%', s.finals+'%', s.avg.toFixed(1)+'%', computeRisk(s.avg), computeStatus(s.avg)]);
+        });
     }
-
-    if (!rows.length) { showToast('No grade data to export yet.', 'error'); return; }
-
-    rows.sort((a,b) => a[0].localeCompare(b[0]));
-
+    if (!rows.length) { showToast('No grades encoded yet.','error'); return; }
+    const label = selected.length===_exportClasses.length ? 'All Classes' : selected.map(c=>c.name).join(', ');
     buildPDF(
       'Academic Risk Report',
-      `Teacher: ${currentUser.name} | ${new Date().toLocaleDateString('en-PH')}`,
-      ['Student Name', 'Class', 'Average', 'Risk Level', 'Status'],
+      `${label} | Teacher: ${currentUser.name}`,
+      ['Student','Class','Midterm','Finals','Average','Risk Level','Status'],
       rows,
-      `EduTrack_Risk_Report_${Date.now()}.pdf`
+      `EduTrack_Report_${Date.now()}.pdf`
     );
-  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
+  } catch(err) { showToast('Export failed: '+err.message,'error'); }
 }
 
 async function exportClassStudentsPDF() {
-  if (!currentClassId || !currentClassData) return;
+  if (!currentClassId||!currentClassData) return;
   showToast('Generating PDF…');
   try {
     const studs = await getStudentsWithGrades(currentClassId);
-    const sorted = [...studs].sort((a,b) => a.student_name.localeCompare(b.student_name));
-    const rows = sorted.map(s => [
+    const rows = [...studs].sort((a,b)=>a.student_name.localeCompare(b.student_name)).map(s=>[
       s.student_name,
-      s.has_grade ? s.midterm + '%' : '—',
-      s.has_grade ? s.finals  + '%' : '—',
-      s.has_grade ? s.avg.toFixed(1) + '%' : '—',
-      s.has_grade ? computeRisk(s.avg) : '—',
-      s.has_grade ? computeStatus(s.avg) : '—'
+      s.has_grade?s.midterm+'%':'—',
+      s.has_grade?s.finals+'%':'—',
+      s.has_grade?s.avg.toFixed(1)+'%':'—',
+      s.has_grade?computeRisk(s.avg):'—',
+      s.has_grade?computeStatus(s.avg):'—'
     ]);
-
     buildPDF(
       `Class Report — ${currentClassData.name}`,
       `Subject: ${currentClassData.subject} | Professor: ${currentUser.name}`,
-      ['Student Name', 'Midterm', 'Finals', 'Average', 'Risk Level', 'Status'],
+      ['Student Name','Midterm','Finals','Average','Risk Level','Status'],
       rows,
       `EduTrack_${currentClassData.name.replace(/\s/g,'_')}_${Date.now()}.pdf`
     );
-  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
+  } catch(err) { showToast('Export failed: '+err.message,'error'); }
 }
 </script>
+
+<!-- Export Filter Modal -->
+<div class="modal-overlay hidden" id="exportFilterModal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Export Risk Report</h3>
+      <button class="modal-close" onclick="closeModal('exportFilterModal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="exportFilterBody">
+      <div style="text-align:center;padding:20px">
+        <div class="spinner" style="width:24px;height:24px;margin:auto;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('exportFilterModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmExportPDF()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export PDF
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
