@@ -10,7 +10,7 @@
   --sidebar-hover:     rgba(255,255,255,0.07);
   --sidebar-text:      rgba(255,255,255,0.82);
   --sidebar-text2:     rgba(255,255,255,0.45);
-  --sidebar-border:    rgba(255,255,255,0.1);
+  --sidebar-border:    rgba(255, 255, 255, 0.301);
 
   --bg:        #eef1ee;
   --bg2:       #ffffff;
@@ -339,21 +339,21 @@ ul { list-style: none; }
   line-height: 1.2;
 }
 .sidebar-logo-text em { font-style: normal; color: var(--green-mid); }
-.sidebar-logo-sub { font-size: 0.61rem; color: var(--sidebar-text2); display: block; font-weight: 400; letter-spacing: 0.04em; }
+.sidebar-logo-sub { font-size: 0.61rem; color: var(--sidebar-text); display: block; font-weight: 400; letter-spacing: 0.04em; }
 
-.sidebar-role { padding: 9px 14px; border-bottom: 1px solid var(--sidebar-border); }
+.sidebar-role { padding: 9px 14px; border-bottom: 1px solid var(--sidebar-border); ;}
 
 .role-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  background: rgba(76,175,80,0.18);
+  background: rgba(231, 231, 231, 0.18);
   border: 1px solid rgba(76,175,80,0.3);
   border-radius: 999px;
   font-size: 0.7rem;
   font-weight: 700;
-  color: var(--green-mid);
+  color: var(--green-light);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -382,8 +382,8 @@ ul { list-style: none; }
 }
 
 .user-info { overflow: hidden; }
-.user-name { font-size: 0.82rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.user-sub  { font-size: 0.69rem; color: var(--sidebar-text2); }
+.user-name { font-size: 0.82rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;  }
+.user-sub  { font-size: 0.69rem; color: var(--sidebar-text); }
 
 .sidebar-nav {
   flex: 1;
@@ -397,7 +397,7 @@ ul { list-style: none; }
   font-size: 0.64rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--sidebar-text2);
+  color: var(--sidebar-text);
   padding: 6px 9px 3px;
   font-weight: 700;
 }
@@ -489,7 +489,12 @@ ul { list-style: none; }
 .stat-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
 .stat-card-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); }
 .stat-card-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; }
-.stat-card-value { font-family: 'Syne', sans-serif; font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; margin-bottom: 3px; }
+.stat-card-value { font-family: 'Syne', sans-serif; 
+  font-size: 2.9rem; 
+  font-weight: 300; 
+  letter-spacing: -0.03em; 
+  line-height: 1; 
+  margin-bottom: 3px; }
 .stat-card-sub   { font-size: 0.74rem; color: var(--text3); }
 
 .stat-card.safe     { border-top: 3px solid var(--safe); }
