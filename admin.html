@@ -442,41 +442,32 @@ function renderRegisterUser() {
           <div id="staffFields" style="display:none;flex-direction:column;gap:13px">
             <div class="form-group">
               <label class="form-label" for="regDept">Department / Faculty</label>
-              <select id="regDept" class="form-select" title="Department" aria-label="Department">
+              <select id="regDept" class="form-select" title="Department" aria-label="Department"
+                onchange="filterProgramsByDept(this.value)">
                 <option value="CCS">CCS — College of Computer Studies</option>
                 <option value="CBA">CBA — College of Business Administration</option>
                 <option value="CAHS">CAHS — College of Allied Health Sciences</option>
-                <option value="CEAS">CEAS — College of Education</option>
-                <option value="CHTM">CHTM — College of Hospitality & Tourism</option>
+                <option value="CEAS">CEAS — College of Education, Arts, and Sciences</option>
+                <option value="CHTM">CHTM — College of Hospitality & Tourism Management</option>
               </select>
             </div>
             <div class="form-group" id="coordProgramField" style="display:none">
-              <label class="form-label" for="regCoordProgram">Program Handled <span style="color:var(--text3);font-size:0.74rem">(for coordinator — determines which classes you see)</span></label>
-              <select id="regCoordProgram" class="form-select" title="Program" aria-label="Program handled">
-                <option value="">— Select program —</option>
-                <option value="BSCS">BSCS</option>
-                <option value="BSIT">BSIT</option>
-                <option value="BSEMC-GD">BSEMC-GD</option>
-                <option value="BSEMC-DA">BSEMC-DA</option>
-                <option value="BSN">BSN</option>
-                <option value="BSM">BSM</option>
-                <option value="BSA">BSA</option>
-                <option value="BSCA">BSCA</option>
-                <option value="BSBA-FM">BSBA-FM</option>
-                <option value="BSBA-MM">BSBA-MM</option>
-                <option value="BSHM">BSHM</option>
-                <option value="BSTM">BSTM</option>
-                <option value="BPED">BPED</option>
-                <option value="BSED">BSED</option>
-                <option value="BSED-ENGLISH">BSED-ENGLISH</option>
-                <option value="BSED-MATH">BSED-MATH</option>
-                <option value="BSED-FILIPINO">BSED-FILIPINO</option>
-                <option value="BSED-SOCIAL STUDIES">BSED-SOCIAL STUDIES</option>
-                <option value="BSED-SCIENCE">BSED-SCIENCE</option>
-                <option value="BECED">BECED</option>
-                <option value="BACOMM">BACOMM</option>
-                <option value="BCAED">BCAED</option>
+              <label class="form-label" for="regCoordProgram">
+                Program Handled <span style="color:var(--critical);font-size:0.75rem">*required</span>
+                <span style="color:var(--text3);font-size:0.74rem;display:block;margin-top:2px">
+                  Programs are filtered based on selected Department.
+                </span>
+              </label>
+              <select id="regCoordProgram" class="form-select" title="Program"
+                aria-label="Program handled" aria-required="true"
+                onchange="showCoordProgramHint(this.value)">
+                <option value="">— Select Department first —</option>
               </select>
+              <div id="coordProgramHint" style="display:none;margin-top:8px;padding:9px 12px;
+                background:var(--green-light);border-radius:8px;font-size:0.78rem;color:var(--green)">
+                ✅ This coordinator will <strong>only see</strong> classes and students in
+                <strong id="coordProgramHintText"></strong>.
+              </div>
             </div>
           </div>
 
@@ -501,14 +492,86 @@ function renderRegisterUser() {
     </div>`;
 }
 
+/* ── Department → Programs mapping ── */
+const DEPT_PROGRAMS = {
+  'CCS':  [
+    {v:'BSCS',                l:'BSCS — Computer Science'},
+    {v:'BSIT',                l:'BSIT — Information Technology'},
+    {v:'BSEMC-GD',            l:'BSEMC-GD — Multimedia (Game Design)'},
+    {v:'BSEMC-DA',            l:'BSEMC-DA — Multimedia (Digital Animation)'},
+  ],
+  'CAHS': [
+    {v:'BSN',                 l:'BSN — Nursing'},
+    {v:'BSM',                 l:'BSM — Midwifery'},
+  ],
+  'CBA':  [
+    {v:'BSA',                 l:'BSA — Accountancy'},
+    {v:'BSCA',                l:'BSCA — Customs Administration'},
+    {v:'BSBA-FM',             l:'BSBA-FM — Financial Management'},
+    {v:'BSBA-MM',             l:'BSBA-MM — Marketing Management'},
+  ],
+  'CEAS': [
+    {v:'BPED',                l:'BPED — Physical Education'},
+    {v:'BSED',                l:'BSED — Secondary Education'},
+    {v:'BSED-ENGLISH',        l:'BSED — English'},
+    {v:'BSED-MATH',           l:'BSED — Mathematics'},
+    {v:'BSED-FILIPINO',       l:'BSED — Filipino'},
+    {v:'BSED-SOCIAL STUDIES', l:'BSED — Social Studies'},
+    {v:'BSED-SCIENCE',        l:'BSED — Science'},
+    {v:'BECED',               l:'BECED — Early Childhood Education'},
+    {v:'BCAED',               l:'BCAED — Arts Education'},
+    {v:'BACOMM',              l:'BACOMM — Communication'},
+  ],
+  'CHTM': [
+    {v:'BSHM',                l:'BSHM — Hospitality Management'},
+    {v:'BSTM',                l:'BSTM — Tourism Management'},
+  ],
+};
+
+function filterProgramsByDept(dept) {
+  const sel  = document.getElementById('regCoordProgram');
+  const hint = document.getElementById('coordProgramHint');
+  if (!sel) return;
+
+  // Reset program dropdown and hint
+  sel.innerHTML = '<option value="">— Select program —</option>';
+  if (hint) hint.style.display = 'none';
+
+  const programs = DEPT_PROGRAMS[dept] || [];
+  if (!programs.length) {
+    sel.innerHTML = '<option value="">No programs listed for this department</option>';
+    return;
+  }
+  programs.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.v; opt.textContent = p.l;
+    sel.appendChild(opt);
+  });
+}
+
+function showCoordProgramHint(program) {
+  const hint = document.getElementById('coordProgramHint');
+  const txt  = document.getElementById('coordProgramHintText');
+  if (!hint||!txt) return;
+  if (program) { txt.textContent=program; hint.style.display='block'; }
+  else hint.style.display='none';
+}
+
 function toggleRegFields() {
   const role = document.getElementById('regRole').value;
   const sf   = document.getElementById('studentFields');
   const tf   = document.getElementById('staffFields');
   const cpf  = document.getElementById('coordProgramField');
-  if (sf)  sf.style.display  = role === 'student' ? 'flex' : 'none';
-  if (tf)  tf.style.display  = (role === 'teacher' || role === 'coordinator') ? 'flex' : 'none';
-  if (cpf) cpf.style.display = role === 'coordinator' ? 'block' : 'none';
+  const hint = document.getElementById('coordProgramHint');
+  if (sf)  sf.style.display  = role==='student' ? 'flex' : 'none';
+  if (tf)  tf.style.display  = (role==='teacher'||role==='coordinator') ? 'flex' : 'none';
+  if (cpf) cpf.style.display = role==='coordinator' ? 'block' : 'none';
+  // Reset when switching away from coordinator
+  if (role !== 'coordinator') {
+    const sel = document.getElementById('regCoordProgram');
+    if (sel) sel.innerHTML = '<option value="">— Select Department first —</option>';
+    if (hint) hint.style.display = 'none';
+  }
 }
 
 async function confirmRegisterUser() {
