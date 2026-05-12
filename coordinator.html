@@ -23,8 +23,19 @@
     <div class="user-info"><div class="user-name" id="sidebarUserName">Coordinator</div><div class="user-sub" id="sidebarUserSub">BSCS Coordinator</div></div>
   </div>
   <nav class="sidebar-nav" aria-label="Coordinator navigation">
-    <div class="nav-section-label">Navigation</div>
-    <a href="#" class="nav-link active" onclick="showView('classes',this)" title="All Classes">
+
+    <!-- MY TEACHING — classes the coordinator personally teaches -->
+    <div class="nav-section-label">My Teaching</div>
+    <a href="#" class="nav-link active" onclick="showView('myclasses',this)" title="My Classes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>My Classes
+    </a>
+    <a href="#" class="nav-link" onclick="showView('riskreport_mine',this)" title="My Risk Reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>My Risk Report
+    </a>
+
+    <!-- COORDINATOR — monitoring all classes in their program -->
+    <div class="nav-section-label" style="margin-top:8px">Program Coordinator</div>
+    <a href="#" class="nav-link" onclick="showView('classes',this)" title="All Classes">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>All Classes
     </a>
     <a href="#" class="nav-link" onclick="showView('reports',this)" title="Risk Reports">
@@ -38,9 +49,22 @@
   </div>
 </aside>
 
+<!-- Mobile overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
 <div class="main-content">
   <header class="topbar">
-    <div class="topbar-left"><h2 id="topbarTitle">All Classes</h2><div class="breadcrumb" id="topbarBreadcrumb">Program Coordinator Dashboard</div></div>
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="toggleSidebar()" title="Open menu" aria-label="Open navigation menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <div>
+        <h2 id="topbarTitle">My Classes</h2>
+        <div class="breadcrumb" id="topbarBreadcrumb">Program Coordinator Dashboard</div>
+      </div>
+    </div>
     <div class="topbar-right" id="topbarRight"></div>
   </header>
   <main class="page-content" id="pageContent" aria-live="polite"></main>
@@ -56,25 +80,357 @@
 <script src="app.js"></script>
 <script>
 
-let currentClass = null;
+let currentClass     = null;
+let currentUser      = null;   // logged-in coordinator
+let currentMyClassId = null;   // class coordinator is currently teaching (My Teaching)
+let currentMyClass   = null;
+let editingEnrollId  = null;
+let editingGradeDocId = null;
+let editingGradeEnrollId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage('coordinator', (user) => {
+    currentUser = user;
     populateSidebar(user);
-    showView('classes');
+    showView('myclasses');
   });
 });
 
 function showView(view, linkEl) {
   document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
   if (linkEl) linkEl.classList.add('active');
-  if (view==='classes') renderClasses();
-  else renderReports();
+  currentClass   = null;
+  currentMyClass = null;
+  if      (view==='myclasses')      renderMyClasses();
+  else if (view==='riskreport_mine') renderMyRiskReport();
+  else if (view==='classes')        renderClasses();
+  else                               renderReports();
 }
 
 function loadingHTML() { return `<div style="display:flex;align-items:center;justify-content:center;height:40vh"><div class="spinner" style="width:30px;height:30px;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div></div>`; }
 
-/* ── All Classes ── */
+/* =============================================
+   MY TEACHING — Classes the coordinator teaches
+   (Filtered by profEmail — separate from "All Classes")
+   ============================================= */
+async function renderMyClasses() {
+  document.getElementById('topbarTitle').textContent = 'My Classes';
+  document.getElementById('topbarBreadcrumb').textContent = 'My Teaching';
+  document.getElementById('topbarRight').innerHTML = '';
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    // ONLY classes where this coordinator is the assigned professor
+    const snap = await db.collection('classes')
+      .where('profEmail','==', currentUser.email).get();
+    const classes = snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    if (!classes.length) {
+      document.getElementById('pageContent').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">📚</div>
+          <div class="empty-state-title">No classes assigned to you</div>
+          <div class="empty-state-sub">Ask the admin to assign classes to ${currentUser.email}.</div>
+        </div>`;
+      return;
+    }
+
+    const cards = classes.map((c,i)=>`
+      <div class="class-card" style="animation-delay:${i*0.06}s">
+        <div class="class-card-header">
+          <div><div class="class-card-title">${c.name}</div><div class="class-card-sub">${c.subject||''}</div></div>
+        </div>
+        <div class="class-card-body">
+          <div class="class-meta">
+            <div class="class-meta-item"><span>Classcode:</span><span>${c.code||'—'}</span></div>
+            <div class="class-meta-item"><span>Schedule:</span><span>${c.schedule||'—'}</span></div>
+            <div class="class-meta-item"><span>Room:</span><span>${c.room||'—'}</span></div>
+          </div>
+          <div class="class-card-footer">
+            <div class="class-student-count">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              ${c.students||0} students
+            </div>
+            <button class="btn btn-primary" style="padding:6px 14px;font-size:0.78rem"
+              onclick="openMyClass('${c.id}')">Manage →</button>
+          </div>
+        </div>
+      </div>`).join('');
+
+    document.getElementById('pageContent').innerHTML = `<div class="class-grid">${cards}</div>`;
+  } catch(err) {
+    document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`;
+  }
+}
+
+async function openMyClass(classId) {
+  const snap = await db.collection('classes').doc(classId).get();
+  currentMyClass   = {id:snap.id,...snap.data()};
+  currentMyClassId = classId;
+  renderMyClassStudents();
+}
+
+async function renderMyClassStudents() {
+  const c = currentMyClass;
+  document.getElementById('topbarTitle').textContent = c.name;
+  document.getElementById('topbarBreadcrumb').textContent = c.subject||'';
+  document.getElementById('topbarRight').innerHTML = `
+    <button class="topbar-btn" onclick="renderMyClasses();document.querySelectorAll('.nav-link')[0].classList.add('active')" title="Back">← Back</button>
+    <button class="topbar-btn primary" onclick="exportMyClassPDF()" title="Export PDF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF
+    </button>`;
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    const [eSnap, gSnap] = await Promise.all([
+      db.collection('enrollments').where('class_id','==',c.id).get(),
+      db.collection('grades').where('class_id','==',c.id).get()
+    ]);
+    const gMap = {};
+    gSnap.docs.forEach(d=>{ gMap[d.data().enrollment_id]={id:d.id,...d.data()}; });
+
+    const students = eSnap.docs.map(d=>{
+      const e=d.data();
+      const g=gMap[d.id];
+      return {
+        enrollment_id: d.id,
+        student_name:  e.student_name||'',
+        student_email: e.student_email||'',
+        student_number:(e.student_email||'').split('@')[0]||'',
+        midterm:  g?.midterm_grade||0,
+        finals:   g?.finals_grade||0,
+        avg:      g?.average_grade||0,
+        has_grade:!!g,
+        has_finals:g?.has_finals!==undefined?g.has_finals:(!!g?.finals_grade),
+        grade_doc_id:g?.id||null
+      };
+    }).sort((a,b)=>a.student_name.localeCompare(b.student_name));
+
+    if (!students.length) {
+      document.getElementById('pageContent').innerHTML = `
+        <div class="empty-state"><div class="empty-state-icon">👤</div>
+        <div class="empty-state-title">No students enrolled yet</div>
+        <div class="empty-state-sub">Ask the admin to assign students to this class.</div></div>`;
+      return;
+    }
+
+    const rows = students.map(s=>`<tr>
+      <td style="font-size:0.78rem;color:var(--text3);font-weight:600">${s.student_number||'—'}</td>
+      <td style="font-weight:500">${s.student_name}</td>
+      <td>${s.has_grade&&s.midterm?`<span>${s.midterm}%</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+      <td>${s.has_grade&&s.finals?`<span>${s.finals}%</span>`:'<span style="color:var(--text3);font-style:italic">Pending</span>'}</td>
+      <td>${s.has_grade?`<strong style="color:${s.avg>=75?'var(--text)':'var(--critical)'}">${s.avg.toFixed(1)}%</strong>`:'<span style="color:var(--text3)">—</span>'}</td>
+      <td>${s.has_grade?riskBadge(computeRisk(s.avg)):'—'}</td>
+      <td>
+        <button class="action-btn" title="Encode grades" onclick="openMyGrade('${s.enrollment_id}','${s.student_name.replace(/'/g,"\\'")}','${s.grade_doc_id||''}',${s.midterm||0},${s.finals||0})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+      </td>
+    </tr>`).join('');
+
+    document.getElementById('pageContent').innerHTML = `
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Students (${students.length})</span>
+        </div>
+        <div class="scroll-hint" style="display:flex;align-items:center;justify-content:flex-end;gap:4px;font-size:0.7rem;color:var(--text3);padding:3px 14px 5px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg>Swipe to see more
+        </div>
+        <div class="table-scroll-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table class="data-table" style="min-width:580px" aria-label="My class students">
+            <thead><tr>
+              <th scope="col">Student ID</th>
+              <th scope="col">Student Name</th>
+              <th scope="col">Midterm (%)</th>
+              <th scope="col">Finals (%)</th>
+              <th scope="col">Average</th>
+              <th scope="col">Risk Level</th>
+              <th scope="col">Encode</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch(err) {
+    document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`;
+  }
+}
+
+/* ── Grade encoding for my class ── */
+function openMyGrade(enrollId, studentName, gradeDocId, midterm, finals) {
+  editingGradeEnrollId = enrollId;
+  editingGradeDocId    = gradeDocId || null;
+  document.getElementById('myGradeStudent').textContent  = studentName;
+  document.getElementById('myGradeMidterm').value = midterm || '';
+  document.getElementById('myGradeFinals').value  = finals  || '';
+  document.getElementById('myGradePreview').style.display = 'none';
+  document.getElementById('myGradeModal').classList.remove('hidden');
+}
+
+function previewMyGrade() {
+  const m    = parseFloat(document.getElementById('myGradeMidterm').value);
+  const fRaw = document.getElementById('myGradeFinals').value.trim();
+  const f    = fRaw !== '' ? parseFloat(fRaw) : null;
+  if (isNaN(m)) { document.getElementById('myGradePreview').style.display='none'; return; }
+  const hasFinals = f!==null && !isNaN(f);
+  const avg  = hasFinals ? (m+f)/2 : m;
+  const risk = computeRisk(avg);
+  const colors = {Safe:'var(--safe)','Slightly At Risk':'var(--slight)','Moderately At Risk':'var(--moderate)','Critically At Risk':'var(--critical)'};
+  document.getElementById('myGradePreview').style.display='block';
+  document.getElementById('myGradePreview').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--bg3);border-radius:9px;border:1px solid var(--border)">
+      <div style="font-size:1.3rem;font-weight:800;color:${colors[risk]};font-family:'Syne',sans-serif">${avg.toFixed(1)}%</div>
+      <div>${riskBadge(risk)}</div>
+    </div>
+    ${!hasFinals?`<div style="font-size:0.75rem;color:var(--text3);margin-top:5px">⚠ Finals not yet encoded. Risk based on Midterm only.</div>`:''}`;
+}
+
+async function saveMyGrade() {
+  const midterm  = parseFloat(document.getElementById('myGradeMidterm').value);
+  const fRaw     = document.getElementById('myGradeFinals').value.trim();
+  const finals   = fRaw !== '' ? parseFloat(fRaw) : null;
+
+  if (isNaN(midterm)||midterm<0||midterm>100) { showToast('Enter valid Midterm grade (0–100).','error'); return; }
+  if (finals!==null&&(isNaN(finals)||finals<0||finals>100)) { showToast('Finals must be 0–100.','error'); return; }
+
+  const hasFinals = finals !== null;
+  const avg = hasFinals ? (midterm+finals)/2 : midterm;
+  const enrollSnap = await db.collection('enrollments').doc(editingGradeEnrollId).get();
+  const e = enrollSnap.data();
+
+  const gradeData = {
+    enrollment_id: editingGradeEnrollId,
+    class_id:      currentMyClassId,
+    class_name:    currentMyClass?.name||'',
+    subject_name:  currentMyClass?.subject||'',
+    student_name:  e.student_name||'',
+    student_email: e.student_email||'',
+    midterm_grade: midterm,
+    finals_grade:  hasFinals ? finals : null,
+    has_finals:    hasFinals,
+    average_grade: avg,
+    risk_level:    computeRisk(avg),
+    status:        computeStatus(avg),
+    encoded_by:    currentUser.uid,
+    updated_at:    firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try {
+    if (editingGradeDocId) {
+      await db.collection('grades').doc(editingGradeDocId).update(gradeData);
+    } else {
+      await db.collection('grades').add({...gradeData, created_at: firebase.firestore.FieldValue.serverTimestamp()});
+    }
+    document.getElementById('myGradeModal').classList.add('hidden');
+    showToast(hasFinals ? 'Grades saved!' : 'Midterm saved. Finals can be added later.');
+    renderMyClassStudents();
+  } catch(err) { showToast('Failed to save: '+err.message,'error'); }
+}
+
+/* ── My Risk Report — only MY classes ── */
+async function renderMyRiskReport() {
+  document.getElementById('topbarTitle').textContent = 'My Risk Report';
+  document.getElementById('topbarBreadcrumb').textContent = 'My Teaching';
+  document.getElementById('topbarRight').innerHTML = `
+    <button class="topbar-btn primary" onclick="exportMyRiskReportPDF()" title="Export PDF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF
+    </button>`;
+  document.getElementById('pageContent').innerHTML = loadingHTML();
+
+  try {
+    // ONLY grades from classes the coordinator personally teaches
+    const classSnap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
+    const myClassIds = classSnap.docs.map(d=>d.id);
+
+    if (!myClassIds.length) {
+      document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No classes assigned to you</div></div>`;
+      return;
+    }
+
+    const gradeSnaps = await Promise.all(myClassIds.map(id=>db.collection('grades').where('class_id','==',id).get()));
+    let allGrades = [];
+    gradeSnaps.forEach(snap=>snap.docs.forEach(d=>allGrades.push(d.data())));
+
+    // Deduplicate
+    const seen = new Set();
+    allGrades = allGrades.filter(g=>{
+      const k=`${g.student_name}_${g.class_id}`;
+      if(seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+
+    const critical = sortStudents(allGrades.filter(g=>computeRisk(g.average_grade)==='Critically At Risk').map(g=>({student_name:g.student_name,className:g.class_name||g.subject_name,avg:g.average_grade})));
+    const moderate = sortStudents(allGrades.filter(g=>computeRisk(g.average_grade)==='Moderately At Risk').map(g=>({student_name:g.student_name,className:g.class_name||g.subject_name,avg:g.average_grade})));
+    const slight   = sortStudents(allGrades.filter(g=>computeRisk(g.average_grade)==='Slightly At Risk').map(g=>({student_name:g.student_name,className:g.class_name||g.subject_name,avg:g.average_grade})));
+
+    if (!allGrades.length) {
+      document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No grades encoded yet</div></div>`;
+      return;
+    }
+
+    const section = (level, items) => {
+      if (!items.length) return '';
+      return `<div class="panel" style="margin-bottom:18px">
+        <div class="panel-header"><span class="panel-title">${riskBadge(level)} — ${items.length} Student${items.length>1?'s':''}</span></div>
+        <div class="table-scroll-wrap" style="overflow-x:auto"><table class="data-table" style="min-width:380px">
+          <thead><tr><th>Name</th><th>Class</th><th>Average</th><th>Risk</th></tr></thead>
+          <tbody>${items.map(s=>`<tr><td>${s.student_name}</td><td>${s.className||'—'}</td><td>${s.avg.toFixed(1)}%</td><td>${riskBadge(level)}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+    };
+
+    document.getElementById('pageContent').innerHTML =
+      section('Critically At Risk',critical)+section('Moderately At Risk',moderate)+section('Slightly At Risk',slight);
+  } catch(err) {
+    document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`;
+  }
+}
+
+async function exportMyRiskReportPDF() {
+  showToast('Generating PDF…');
+  try {
+    const classSnap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
+    const myClasses = classSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const rows = [];
+    for (const c of myClasses) {
+      const [eSnap, gSnap] = await Promise.all([
+        db.collection('enrollments').where('class_id','==',c.id).get(),
+        db.collection('grades').where('class_id','==',c.id).get()
+      ]);
+      const gMap = {}; gSnap.docs.forEach(d=>{ gMap[d.data().enrollment_id]=d.data(); gMap[d.id]=d.data(); });
+      eSnap.docs.sort((a,b)=>(a.data().student_name||'').localeCompare(b.data().student_name||'')).forEach(d=>{
+        const e=d.data(), g=gMap[d.id]||gMap[e.enrollment_id];
+        const sNum=(e.student_email||'').split('@')[0]||'—';
+        rows.push([sNum, e.student_name||'—', c.name, g?g.midterm_grade+'%':'—', g?g.finals_grade+'%':'—', g?(g.average_grade||0).toFixed(1)+'%':'—', g?computeRisk(g.average_grade||0):'—', g?computeStatus(g.average_grade||0):'—']);
+      });
+    }
+    if (!rows.length) { showToast('No grade data to export.','error'); return; }
+    buildPDF('My Teaching Risk Report', `Instructor: ${currentUser.name} | ${new Date().toLocaleDateString('en-PH')}`,
+      ['Student ID','Student Name','Class','Midterm (%)','Finals (%)','Average','Risk Level','Status'], rows,
+      `EduTrack_MyTeaching_${Date.now()}.pdf`);
+  } catch(err) { showToast('Export failed: '+err.message,'error'); }
+}
+
+async function exportMyClassPDF() {
+  if (!currentMyClass) return;
+  showToast('Generating PDF…');
+  try {
+    const [eSnap, gSnap] = await Promise.all([
+      db.collection('enrollments').where('class_id','==',currentMyClassId).get(),
+      db.collection('grades').where('class_id','==',currentMyClassId).get()
+    ]);
+    const gMap = {}; gSnap.docs.forEach(d=>{ gMap[d.data().enrollment_id]=d.data(); gMap[d.id]=d.data(); });
+    const rows = eSnap.docs.sort((a,b)=>(a.data().student_name||'').localeCompare(b.data().student_name||'')).map(d=>{
+      const e=d.data(), g=gMap[d.id]||gMap[e.enrollment_id];
+      const sNum=(e.student_email||'').split('@')[0]||'—';
+      const remarks=!g?'Not encoded':(!g.finals_grade?'Finals pending':'');
+      return [sNum, e.student_name||'—', g?g.midterm_grade+'%':'—', g?g.finals_grade+'%':'—', g?(g.average_grade||0).toFixed(1)+'%':'—', g?computeRisk(g.average_grade||0):'—', g?computeStatus(g.average_grade||0):'—', remarks];
+    });
+    buildPDF(`Class Report — ${currentMyClass.name}`, `Subject: ${currentMyClass.subject} | Instructor: ${currentUser.name}`,
+      ['Student ID','Student Name','Midterm (%)','Finals (%)','Average','Risk Level','Status','Remarks'], rows,
+      `EduTrack_${currentMyClass.name.replace(/\s/g,'_')}_${Date.now()}.pdf`);
+  } catch(err) { showToast('Export failed: '+err.message,'error'); }
+}
 async function renderClasses() {
   currentClass = null;
   document.getElementById('topbarTitle').textContent = 'All Classes';
@@ -268,7 +624,14 @@ async function renderClassStudents(classId) {
           </button>
         </div>
         <table class="data-table" aria-label="Students sorted alphabetically">
-          <thead><tr><th scope="col">Student Name</th><th scope="col">Average</th><th scope="col">Risk Level</th><th scope="col">Status</th></tr></thead>
+          <thead>
+            <tr>
+              <th scope="col">Student Name</th>
+              <th scope="col">Average</th>
+              <th scope="col">Risk Level</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
           <tbody>${rows||'<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-title">No students enrolled yet</div></div></td></tr>'}</tbody>
         </table>
       </div>`;
@@ -428,6 +791,49 @@ async function exportClassReportPDF(classId, className, subject) {
     );
   } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
 }
+
+function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
+function toggleSidebar() {
+  document.getElementById('sidebar')?.classList.toggle('open');
+  document.getElementById('sidebarOverlay')?.classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebarOverlay')?.classList.remove('show');
+}
+document.querySelectorAll('.nav-link').forEach(l=>{
+  l.addEventListener('click',()=>{ if(window.innerWidth<=680) closeSidebar(); });
+});
 </script>
+
+<!-- Grade Encode Modal (My Teaching) -->
+<div class="modal-overlay hidden" id="myGradeModal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Encode Grades — <span id="myGradeStudent" style="color:var(--green)"></span></h3>
+      <button class="modal-close" onclick="closeModal('myGradeModal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="myGradeMidterm">Midterm Grade (0–100) <span style="color:var(--critical);font-size:0.75rem">*required</span></label>
+          <input type="number" id="myGradeMidterm" class="form-input" min="0" max="100"
+            placeholder="e.g. 85" oninput="previewMyGrade()"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="myGradeFinals">Finals Grade (0–100) <span style="color:var(--text3);font-size:0.75rem">optional</span></label>
+          <input type="number" id="myGradeFinals" class="form-input" min="0" max="100"
+            placeholder="Leave blank if not yet" oninput="previewMyGrade()"/>
+        </div>
+      </div>
+      <div id="myGradePreview" style="margin-top:10px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('myGradeModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMyGrade()">Save Grades</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
