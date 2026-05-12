@@ -245,12 +245,12 @@ async function renderClassStudents(classId) {
     const filtered = sortStudents(
       searchTerm ? all.filter(s=>s.student_name.toLowerCase().includes(searchTerm.toLowerCase())) : all
     );
-/*TABLE*/
     const rows = filtered.map(s=>`<tr>
-      <td>${s.student_name}</td>
-      <td>${s.has_grade ? `<strong style="color:${s.avg>=75?'var(--text)':'var(--critical)'}">${s.avg.toFixed(1)}%</strong>` : '<span style="color:var(--text3);font-size:0.8rem">Not yet encoded</span>'}</td>
-      <td>${s.has_grade && s.midterm ? `<span style="font-size:0.78rem;color:var(--text3)">${s.midterm}%</span>` : '<span style="color:var(--text3)">—</span>'}</td>
-      <td>${s.has_grade && s.finals  ? `<span style="font-size:0.78rem;color:var(--text3)">${s.finals}%</span>`  : '<span style="font-size:0.75rem;color:var(--text3);font-style:italic">Pending</span>'}</td>
+      <td style="font-size:0.78rem;color:var(--text3);font-weight:600;white-space:nowrap">${s.student_number||'—'}</td>
+      <td style="font-weight:500">${s.student_name}</td>
+      <td>${s.has_grade ? `<strong style="color:${s.avg>=75?'var(--text)':'var(--critical)'}">${s.avg.toFixed(1)}%</strong>` : '<span style="color:var(--text3);font-size:0.8rem">—</span>'}</td>
+      <td>${s.has_grade && s.midterm ? `<span style="font-size:0.78rem">${s.midterm}%</span>` : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${s.has_grade && s.finals  ? `<span style="font-size:0.78rem">${s.finals}%</span>`  : '<span style="font-size:0.75rem;color:var(--text3);font-style:italic">Pending</span>'}</td>
       <td>${s.has_grade ? riskBadge(computeRisk(s.avg)) : '—'}</td>
       <td>
         <div class="action-btns">
@@ -282,6 +282,7 @@ async function renderClassStudents(classId) {
           <table class="data-table" style="min-width:520px" aria-label="Students sorted alphabetically">
             <thead>
               <tr>
+                <th scope="col">Student ID</th>
                 <th scope="col">Student Name</th>
                 <th scope="col">Average</th>
                 <th scope="col">Midterm</th>
@@ -300,7 +301,7 @@ async function renderClassStudents(classId) {
 /* ── Reports View ── */
 async function renderReportsView() {
   setTopbar('Risk Reports','Teacher Dashboard');
-  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="exportReportPDF()" title="Export PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button>`;
+  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="openExportFilter()" title="Export PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button>`;
   document.getElementById('pageContent').innerHTML = loadingHTML();
 
   try {
@@ -343,14 +344,19 @@ async function getStudentsWithGrades(classId) {
   return eSnap.docs.map(d => {
     const e = {enrollment_id:d.id,...d.data()};
     const g = gradesMap[d.id];
+    // Extract student number from email (e.g. 202411355@gordoncollege.edu.ph → 202411355)
+    const studentNum = (e.student_email||'').split('@')[0] || '';
     return {
-      enrollment_id: d.id,
-      student_name:  e.student_name,
-      midterm:       g?.midterm_grade  || 0,
-      finals:        g?.finals_grade   || 0,
-      avg:           g?.average_grade  || 0,
-      grade_doc_id:  g?.id             || null,
-      has_grade:     !!g
+      enrollment_id:  d.id,
+      student_name:   e.student_name,
+      student_email:  e.student_email || '',
+      student_number: studentNum,
+      midterm:        g?.midterm_grade  || 0,
+      finals:         g?.finals_grade   || 0,
+      avg:            g?.average_grade  || 0,
+      grade_doc_id:   g?.id             || null,
+      has_grade:      !!g,
+      has_finals:     g?.has_finals !== undefined ? g.has_finals : (!!g?.finals_grade)
     };
   });
 }
@@ -484,128 +490,211 @@ function loadingHTML() { return `<div style="display:flex;align-items:center;jus
 /* =============================================
    PDF EXPORT FUNCTIONS
    ============================================= */
+/* ── Shared PDF builder ── */
 function buildPDF(title, subtitle, columns, rows, filename) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
   const now = new Date().toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
 
-  // Header background
+  // Dark green header bar
   doc.setFillColor(26, 53, 32);
-  doc.rect(0, 0, 210, 28, 'F');
+  doc.rect(0, 0, 297, 28, 'F');
 
-  // Logo text
+  // Header text
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold');
   doc.text('EduTrack AI', 14, 11);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.setTextColor(180, 220, 180);
   doc.text('Academic Risk & Performance Monitor — Gordon College', 14, 17);
   doc.text(`Generated: ${now}`, 14, 23);
 
-  // Title
+  // Report title
   doc.setTextColor(26, 53, 32);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13); doc.setFont('helvetica', 'bold');
   doc.text(title, 14, 38);
-
   if (subtitle) {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
-    doc.text(subtitle, 14, 45);
+    doc.text(subtitle, 14, 44);
   }
 
   // Table
   doc.autoTable({
     head: [columns],
     body: rows,
-    startY: subtitle ? 50 : 44,
+    startY: subtitle ? 49 : 44,
     theme: 'grid',
-    headStyles: {
-      fillColor: [46, 125, 50],
-      textColor: 255,
-      fontStyle: 'bold',
-      fontSize: 9
+    headStyles: { fillColor:[46,125,50], textColor:255, fontStyle:'bold', fontSize:8.5 },
+    bodyStyles: { fontSize:8, textColor:[30,30,30] },
+    alternateRowStyles: { fillColor:[240,248,240] },
+    columnStyles: {
+      0: { cellWidth: 22 },  // Student ID — narrow
+      1: { cellWidth: 55 },  // Student Name — wider
     },
-    bodyStyles: { fontSize: 8.5, textColor: [30, 30, 30] },
-    alternateRowStyles: { fillColor: [240, 248, 240] },
-    columnStyles: { 0: { cellWidth: 55 } },
-    margin: { left: 14, right: 14 }
+    margin: { left:14, right:14 }
   });
 
-  // Footer
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
+  // Page numbers
+  const pc = doc.internal.getNumberOfPages();
+  for (let i=1;i<=pc;i++) {
     doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(`EduTrack AI — Confidential | Page ${i} of ${pageCount}`, 14, 290);
+    doc.setFontSize(8); doc.setTextColor(150);
+    doc.text(`EduTrack AI — Confidential | Page ${i} of ${pc}`, 14, 205);
   }
-
   doc.save(filename);
   showToast('PDF exported successfully!');
 }
 
-async function exportReportPDF() {
+/* ── Risk Reports Export with Block filter ── */
+let _exportClasses = [], _exportSelected = [], _exportBlock = 'all';
+
+async function exportReportPDF() { openExportFilter(); }
+
+async function openExportFilter() {
+  const snap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
+  _exportClasses  = snap.docs.map(d=>({id:d.id,...d.data()}));
+  _exportSelected = _exportClasses.map(c=>c.id);
+  _exportBlock    = 'all';
+
+  // Get unique blocks from class names (e.g. "BSCS 2B" → B)
+  const blocks = [...new Set(_exportClasses.map(c=>(c.block)||(c.name?.match(/([A-Z])$/)?.[1])||''))].filter(Boolean).sort();
+
+  document.getElementById('exportFilterBody').innerHTML = `
+    <p style="font-size:0.84rem;color:var(--text2);margin-bottom:12px">Select which class(es) to include:</p>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">Filter by Block</label>
+      <div class="chip-group">
+        <button class="chip active" id="chipBlockAll" onclick="filterExportByBlock('all',this)">All Blocks</button>
+        ${blocks.map(b=>`<button class="chip" onclick="filterExportByBlock('${b}',this)">Block ${b}</button>`).join('')}
+      </div>
+    </div>
+    <label class="form-label">Classes</label>
+    <div class="chip-group" id="exportClassChips">
+      <button class="chip active" id="chipAll" onclick="toggleAllExport(this)">✅ All Classes</button>
+      ${_exportClasses.map(c=>`
+        <button class="chip active" data-id="${c.id}" data-block="${c.block||c.name?.match(/([A-Z])$/)?.[1]||''}"
+          onclick="toggleExportChip(this,'${c.id}')">
+          ${c.name} — ${c.subject||''}
+        </button>`).join('')}
+    </div>`;
+  document.getElementById('exportFilterModal').classList.remove('hidden');
+}
+
+function filterExportByBlock(block, el) {
+  _exportBlock = block;
+  document.querySelectorAll('#exportFilterBody .chip[id^="chipBlock"], #exportFilterBody .chip:not([data-id]):not(#chipAll)').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  // Show/hide class chips by block
+  document.querySelectorAll('[data-id]').forEach(chip => {
+    const b = chip.getAttribute('data-block');
+    const show = block==='all' || b===block;
+    chip.style.display = show ? '' : 'none';
+    if (show) chip.classList.add('active'); else chip.classList.remove('active');
+  });
+  _exportSelected = _exportClasses.filter(c=>{
+    const b = c.block||(c.name?.match(/([A-Z])$/)?.[1])||'';
+    return block==='all'||b===block;
+  }).map(c=>c.id);
+  const allChip = document.getElementById('chipAll');
+  if (allChip) allChip.classList.toggle('active', _exportSelected.length===_exportClasses.length);
+}
+
+function toggleExportChip(el, id) {
+  el.classList.toggle('active');
+  _exportSelected = el.classList.contains('active') ? [..._exportSelected,id] : _exportSelected.filter(x=>x!==id);
+  const allChip = document.getElementById('chipAll');
+  if (allChip) allChip.classList.toggle('active', _exportSelected.length===_exportClasses.length);
+}
+function toggleAllExport(el) {
+  const activate = !el.classList.contains('active');
+  el.classList.toggle('active', activate);
+  _exportSelected = activate ? _exportClasses.map(c=>c.id) : [];
+  document.querySelectorAll('[data-id]').forEach(c=>{ if(c.style.display!=='none') c.classList.toggle('active', activate); });
+}
+
+async function confirmExportPDF() {
+  if (!_exportSelected.length) { showToast('Select at least one class.','error'); return; }
+  closeModal('exportFilterModal');
   showToast('Generating PDF…');
   try {
-    const classSnap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
-    const classes   = classSnap.docs.map(d => ({id:d.id,...d.data()}));
-
+    const selected = _exportClasses.filter(c=>_exportSelected.includes(c.id));
     const rows = [];
-    for (const c of classes) {
+    for (const c of selected) {
       const studs = await getStudentsWithGrades(c.id);
-      studs.filter(s => s.has_grade).forEach(s => {
+      studs.filter(s=>s.has_grade).sort((a,b)=>a.student_name.localeCompare(b.student_name)).forEach(s=>{
+        const remarks = !s.has_finals ? 'Finals not yet encoded' : '';
         rows.push([
+          s.student_number||'—',
           s.student_name,
           c.name,
-          s.avg.toFixed(1) + '%',
+          s.midterm?s.midterm+'%':'—',
+          s.finals?s.finals+'%':'—',
+          s.avg.toFixed(1)+'%',
           computeRisk(s.avg),
-          computeStatus(s.avg)
+          computeStatus(s.avg),
+          remarks
         ]);
       });
     }
-
-    if (!rows.length) { showToast('No grade data to export yet.', 'error'); return; }
-
-    rows.sort((a,b) => a[0].localeCompare(b[0]));
-
+    if (!rows.length) { showToast('No grade data to export yet.','error'); return; }
+    const label = selected.length===_exportClasses.length?'All Classes':selected.map(c=>c.name).join(', ');
     buildPDF(
       'Academic Risk Report',
-      `Teacher: ${currentUser.name} | ${new Date().toLocaleDateString('en-PH')}`,
-      ['Student Name', 'Class', 'Average', 'Risk Level', 'Status'],
+      `${label} | Teacher: ${currentUser.name} | ${new Date().toLocaleDateString('en-PH')}`,
+      ['Student ID','Student Name','Class','Midterm (%)','Finals (%)','Average','Risk Level','Status','Remarks'],
       rows,
-      `EduTrack_Risk_Report_${Date.now()}.pdf`
+      `EduTrack_Report_${Date.now()}.pdf`
     );
-  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
+  } catch(err) { showToast('Export failed: '+err.message,'error'); }
 }
 
+/* ── Class Students Export ── */
 async function exportClassStudentsPDF() {
-  if (!currentClassId || !currentClassData) return;
+  if (!currentClassId||!currentClassData) return;
   showToast('Generating PDF…');
   try {
     const studs = await getStudentsWithGrades(currentClassId);
-    const sorted = [...studs].sort((a,b) => a.student_name.localeCompare(b.student_name));
-    const rows = sorted.map(s => [
+    const rows = [...studs].sort((a,b)=>a.student_name.localeCompare(b.student_name)).map(s=>[
+      s.student_number||'—',
       s.student_name,
-      s.has_grade ? s.midterm + '%' : '—',
-      s.has_grade ? s.finals  + '%' : '—',
-      s.has_grade ? s.avg.toFixed(1) + '%' : '—',
-      s.has_grade ? computeRisk(s.avg) : '—',
-      s.has_grade ? computeStatus(s.avg) : '—'
+      s.has_grade?s.midterm+'%':'—',
+      s.has_grade?s.finals+'%':'—',
+      s.has_grade?s.avg.toFixed(1)+'%':'—',
+      s.has_grade?computeRisk(s.avg):'—',
+      s.has_grade?computeStatus(s.avg):'—',
+      !s.has_grade?'Not encoded':!s.has_finals?'Finals pending':''
     ]);
-
     buildPDF(
       `Class Report — ${currentClassData.name}`,
       `Subject: ${currentClassData.subject} | Professor: ${currentUser.name}`,
-      ['Student Name', 'Midterm', 'Finals', 'Average', 'Risk Level', 'Status'],
+      ['Student ID','Student Name','Midterm (%)','Finals (%)','Average','Risk Level','Status','Remarks'],
       rows,
       `EduTrack_${currentClassData.name.replace(/\s/g,'_')}_${Date.now()}.pdf`
     );
-  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
+  } catch(err) { showToast('Export failed: '+err.message,'error'); }
 }
 </script>
+
+<!-- Export Filter Modal -->
+<div class="modal-overlay hidden" id="exportFilterModal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Export Risk Report</h3>
+      <button class="modal-close" onclick="closeModal('exportFilterModal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="exportFilterBody">
+      <div style="text-align:center;padding:20px"><div class="spinner" style="width:24px;height:24px;margin:auto;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('exportFilterModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmExportPDF()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export PDF
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
