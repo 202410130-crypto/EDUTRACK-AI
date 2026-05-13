@@ -104,7 +104,7 @@
 </head>
 <body class="login-body">
 
-<div class="  login-wrapper">
+<div class="login-wrapper">
 
   <!-- Left panel — branding -->
   <div class="login-brand">
@@ -138,6 +138,21 @@
           </div>
         </div>
       </div>
+
+      <!-- QR Code — scan to open EduTrack AI on mobile -->
+      <div style="margin-top:28px;display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div style="font-size:0.72rem;font-weight:600;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.1em">
+          📱 Scan to open on mobile
+        </div>
+        <div id="qrcode"
+          style="background:#fff;padding:10px;border-radius:12px;width:fit-content;
+                 box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+        </div>
+        <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);text-align:center;max-width:180px;line-height:1.5">
+          edutrack-ai-seven.vercel.app
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -201,5 +216,23 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="firebase.js"></script>
 <script src="app.js"></script>
+
+<!-- QR Code generator -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const qrEl = document.getElementById('qrcode');
+    if (qrEl && typeof QRCode !== 'undefined') {
+      new QRCode(qrEl, {
+        text:         'https://edutrack-ai-seven.vercel.app',
+        width:        140,
+        height:       140,
+        colorDark:    '#1a3520',   // dark green — matches EduTrack brand
+        colorLight:   '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    }
+  });
+</script>
 </body>
 </html>
