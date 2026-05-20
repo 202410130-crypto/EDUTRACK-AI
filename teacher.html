@@ -47,36 +47,9 @@
   <main class="page-content" id="pageContent" aria-live="polite"></main>
 </div>
 
-<!-- Edit Grade Modal (Midterm + Finals) -->
-<div class="modal-overlay hidden" id="editGradeModal" role="dialog" aria-modal="true" aria-labelledby="editGradeTitle">
-  <div class="modal">
-    <div class="modal-header"><h3 class="modal-title" id="editGradeTitle">Encode Grades</h3><button class="modal-close" onclick="closeModal('editGradeModal')" aria-label="Close">✕</button></div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label" for="editStudentName">Student</label><input type="text" id="editStudentName" class="form-input" title="Student name" aria-label="Student name" readonly/></div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="editMidterm">Midterm Grade (0–100)</label>
-          <input type="number" id="editMidterm" class="form-input" placeholder="e.g. 78" min="0" max="100" title="Midterm grade" aria-label="Midterm grade" aria-required="true" oninput="previewGrade()"/>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="editFinals">Finals Grade (0–100)</label>
-          <input type="number" id="editFinals" class="form-input" placeholder="e.g. 82" min="0" max="100" title="Finals grade" aria-label="Finals grade" aria-required="true" oninput="previewGrade()"/>
-        </div>
-      </div>
-      <!-- Live preview -->
-      <div id="gradePreview" style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:12px 14px;display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:0.78rem;color:var(--text3)">Computed Average</span>
-          <span id="previewAvg" style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800"></span>
-        </div>
-        <div style="margin-top:6px" id="previewRisk"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('editGradeModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmEditGrade()">Save Grades</button>
-    </div>
-  </div>
+<!-- Auto-save indicator -->
+<div id="saveIndicator" style="position:fixed;top:16px;right:16px;background:var(--green);color:#fff;padding:8px 16px;border-radius:8px;font-size:0.82rem;font-weight:600;z-index:999;display:none;align-items:center;gap:7px;box-shadow:0 3px 12px rgba(0,0,0,0.2)">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="width:13px;height:13px"><polyline points="20 6 9 17 4 12"/></svg> Saved
 </div>
 
 <!-- Delete Student Modal -->
@@ -245,22 +218,28 @@ async function renderClassStudents(classId) {
     const filtered = sortStudents(
       searchTerm ? all.filter(s=>s.student_name.toLowerCase().includes(searchTerm.toLowerCase())) : all
     );
+/*TABLE*/
+    const riskMap2 = {'Safe':'safe','Slightly At Risk':'slight','Moderately At Risk':'moderate','Critically At Risk':'critical'};
     const rows = filtered.map(s=>`<tr>
-      <td style="font-size:0.78rem;color:var(--text3);font-weight:600;white-space:nowrap">${s.student_number||'—'}</td>
+      <td style="font-size:0.75rem;color:var(--text3);white-space:nowrap">${s.student_number||'—'}</td>
       <td style="font-weight:500">${s.student_name}</td>
-      <td>${s.has_grade ? `<strong style="color:${s.avg>=75?'var(--text)':'var(--critical)'}">${s.avg.toFixed(1)}%</strong>` : '<span style="color:var(--text3);font-size:0.8rem">—</span>'}</td>
-      <td>${s.has_grade && s.midterm ? `<span style="font-size:0.78rem">${s.midterm}%</span>` : '<span style="color:var(--text3)">—</span>'}</td>
-      <td>${s.has_grade && s.finals  ? `<span style="font-size:0.78rem">${s.finals}%</span>`  : '<span style="font-size:0.75rem;color:var(--text3);font-style:italic">Pending</span>'}</td>
-      <td>${s.has_grade ? riskBadge(computeRisk(s.avg)) : '—'}</td>
+      <td style="padding:4px 8px">
+        <input type="number" min="0" max="100" step="0.01"
+          value="${s.has_grade ? s.avg : ''}" placeholder="—"
+          data-enroll="${s.enrollment_id}" data-gradedoc="${s.grade_doc_id||''}"
+          data-name="${s.student_name.replace(/"/g,'&quot;')}"
+          onchange="saveInlineGrade(this)"
+          onfocus="this.select();this.style.borderColor='var(--green)'"
+          onblur="this.style.borderColor='var(--border)'"
+          style="width:80px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:0.88rem;font-weight:600;text-align:center;background:var(--surface);color:var(--text)"/>
+      </td>
+      <td id="risk_${s.enrollment_id}">${s.has_grade?`<span class="risk-badge ${riskMap2[computeRisk(s.avg)]||'safe'}">${computeRisk(s.avg)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+      <td id="status_${s.enrollment_id}">${s.has_grade?statusBadge(computeStatus(s.avg)):'<span style="color:var(--text3)">—</span>'}</td>
       <td>
-        <div class="action-btns">
-          <button class="action-btn" title="Encode grades for ${s.student_name}" aria-label="Encode grades for ${s.student_name}" onclick="openEditGrade('${s.enrollment_id}','${s.student_name}','${s.grade_doc_id||''}',${s.midterm||0},${s.finals||0})">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          <button class="action-btn delete" title="Remove ${s.student_name}" aria-label="Remove student ${s.student_name}" onclick="openDelete('${s.enrollment_id}','${s.student_name}','${s.grade_doc_id||''}')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-          </button>
-        </div>
+        <button class="action-btn delete" title="Remove ${s.student_name}"
+          onclick="openDelete('${s.enrollment_id}','${s.student_name.replace(/'/g,"\\'")}','${s.grade_doc_id||''}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
       </td>
     </tr>`).join('');
 
@@ -272,21 +251,22 @@ async function renderClassStudents(classId) {
             <label for="studentSearch" class="sr-only">Search students</label>
             <input type="search" id="studentSearch" class="search-input" placeholder="Search student…" title="Search by name" aria-label="Search students" oninput="searchTerm=this.value;renderClassStudents('${classId}')" value="${searchTerm}"/>
           </div>
-          <span style="font-size:0.78rem;color:var(--text3)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;vertical-align:middle" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-            ${filtered.length} student${filtered.length!==1?'s':''}
-          </span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:0.75rem;color:var(--text3)">${_cachedStudents.filter(s=>s.has_grade).length} encoded · ${_cachedStudents.filter(s=>!s.has_grade).length} pending</span>
+            <button class="btn btn-primary" style="padding:5px 11px;font-size:0.75rem" onclick="exportClassStudentsPDF()">Export PDF</button>
+          </div>
         </div>
         <div class="scroll-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg> Swipe to see more</div>
-        <div class="table-scroll-wrap">
-          <table class="data-table" style="min-width:520px" aria-label="Students sorted alphabetically">
+        <div style="padding:8px 16px;background:var(--green-light);border-bottom:1px solid rgba(46,125,50,0.15);font-size:0.78rem;color:var(--green)">
+        💡 Click a grade cell → type Final Grade (0–100) → press <kbd style="background:rgba(255,255,255,0.6);padding:1px 5px;border-radius:4px">Enter</kbd> to auto-save.
+      </div>
+      <div class="table-scroll-wrap">
+          <table class="data-table" style="min-width:540px" aria-label="Grade spreadsheet">
             <thead>
               <tr>
-                <th scope="col">Student ID</th>
                 <th scope="col">Student Name</th>
                 <th scope="col">Average</th>
-                <th scope="col">Midterm</th>
-                <th scope="col">Finals</th>
+                <th scope="col">Final Grade (%)</th>
                 <th scope="col">Risk Level</th>
                 <th scope="col">Actions</th>
               </tr>
@@ -301,7 +281,7 @@ async function renderClassStudents(classId) {
 /* ── Reports View ── */
 async function renderReportsView() {
   setTopbar('Risk Reports','Teacher Dashboard');
-  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="openExportFilter()" title="Export PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button>`;
+  document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="exportReportPDF()" title="Export PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button>`;
   document.getElementById('pageContent').innerHTML = loadingHTML();
 
   try {
@@ -340,25 +320,22 @@ async function getStudentsWithGrades(classId) {
     db.collection('grades').where('class_id','==',classId).get()
   ]);
   const gradesMap = {};
-  gSnap.docs.forEach(d => { gradesMap[d.data().enrollment_id] = {id:d.id,...d.data()}; });
-  return eSnap.docs.map(d => {
-    const e = {enrollment_id:d.id,...d.data()};
-    const g = gradesMap[d.id];
-    // Extract student number from email (e.g. 202411355@gordoncollege.edu.ph → 202411355)
-    const studentNum = (e.student_email||'').split('@')[0] || '';
-    return {
-      enrollment_id:  d.id,
-      student_name:   e.student_name,
-      student_email:  e.student_email || '',
-      student_number: studentNum,
-      midterm:        g?.midterm_grade  || 0,
-      finals:         g?.finals_grade   || 0,
-      avg:            g?.average_grade  || 0,
-      grade_doc_id:   g?.id             || null,
-      has_grade:      !!g,
-      has_finals:     g?.has_finals !== undefined ? g.has_finals : (!!g?.finals_grade)
-    };
+  gSnap.docs.forEach(d => {
+    const data = d.data(), key = data.enrollment_id;
+    if (!gradesMap[key]||(data.updated_at?.seconds||0)>(gradesMap[key]?.updated_at?.seconds||0))
+      gradesMap[key] = {id:d.id,...data};
   });
+  const seen = new Set();
+  const result = eSnap.docs
+    .filter(d=>{ const n=d.data().student_name; if(seen.has(n)) return false; seen.add(n); return true; })
+    .map(d => {
+      const e = {enrollment_id:d.id,...d.data()};
+      const g = gradesMap[d.id];
+      const fg = g?.finals_grade ?? g?.average_grade ?? null;
+      return { enrollment_id:d.id, student_name:e.student_name, student_email:e.student_email||'', student_number:(e.student_email||'').split('@')[0]||'', avg:fg||0, grade_doc_id:g?.id||null, has_grade:fg!==null };
+    });
+  _cachedStudents = result;
+  return result;
 }
 
 function countRisk(students) {
@@ -371,46 +348,49 @@ function countRisk(students) {
 }
 
 /* ── Grade preview ── */
-function previewGrade() {
-  const mVal = document.getElementById('editMidterm').value.trim();
-  const fVal = document.getElementById('editFinals').value.trim();
-  const m    = parseFloat(mVal);
-  const f    = parseFloat(fVal);
-  const preview = document.getElementById('gradePreview');
-  if (mVal === '' && fVal === '') { preview.style.display='none'; return; }
-  if ((mVal !== '' && isNaN(m)) || (fVal !== '' && isNaN(f))) { preview.style.display='none'; return; }
-  const avg = (mVal !== '' && fVal !== '') ? (m+f)/2 : mVal !== '' ? m : f;
-  const riskLevel = computeRisk(avg);
-  const riskColor = riskLevel==='Safe'?'var(--safe)':riskLevel==='Slightly At Risk'?'var(--slight)':riskLevel==='Moderately At Risk'?'var(--moderate)':'var(--critical)';
-  document.getElementById('previewAvg').textContent  = avg.toFixed(1)+'%';
-  document.getElementById('previewAvg').style.color  = riskColor;
-  document.getElementById('previewRisk').innerHTML   = riskBadge(riskLevel);
-  preview.style.display = 'block';
-}
+function previewGrade()  {}
+function openEditGrade() {}
+function confirmEditGrade() {}
 
-/* ── Grade Modals ── */function openEditGrade(enrollmentId, studentName, gradeDocId, midterm, finals) {
-  editingEnrollmentId = enrollmentId;
-  editingGradeDocId   = gradeDocId || null;
-  document.getElementById('editStudentName').value = studentName;
-  document.getElementById('editMidterm').value     = midterm || '';
-  document.getElementById('editFinals').value      = finals  || '';
-  document.getElementById('gradePreview').style.display = 'none';
-  if (midterm || finals) previewGrade();
-  document.getElementById('editGradeModal').classList.remove('hidden');
-  setTimeout(()=>document.getElementById('editMidterm').focus(),100);
-}
-
-async function confirmEditGrade() {
-  const midtermVal = document.getElementById('editMidterm').value.trim();
-  const finalsVal  = document.getElementById('editFinals').value.trim();
-  const midterm    = parseFloat(midtermVal);
-  const finals     = parseFloat(finalsVal);
-
-  if (midtermVal === '' && finalsVal === '') {
-    showToast('Please enter at least a Midterm grade.', 'error'); return;
+/* ── Inline grade save ── */
+let _cachedStudents = [];
+async function saveInlineGrade(input) {
+  const enrollId   = input.getAttribute('data-enroll');
+  const gradeDocId = input.getAttribute('data-gradedoc') || null;
+  const sName      = input.getAttribute('data-name');
+  const rawVal     = input.value.trim();
+  if (!rawVal) {
+    if (gradeDocId) { try { await db.collection('grades').doc(gradeDocId).delete(); } catch(e){} }
+    const s = _cachedStudents.find(x=>x.enrollment_id===enrollId);
+    if (s) { s.has_grade=false; s.avg=0; input.setAttribute('data-gradedoc',''); }
+    const rEl = document.getElementById('risk_'+enrollId);
+    const sEl = document.getElementById('status_'+enrollId);
+    if (rEl) rEl.innerHTML='<span style="color:var(--text3)">—</span>';
+    if (sEl) sEl.innerHTML='<span style="color:var(--text3)">—</span>';
+    return;
   }
+  const grade = parseFloat(rawVal);
+  if (isNaN(grade)||grade<0||grade>100) { input.style.borderColor='var(--critical)'; showToast('Grade must be 0–100.','error'); return; }
+  const risk = computeRisk(grade), status = computeStatus(grade);
+  const riskMap = {'Safe':'safe','Slightly At Risk':'slight','Moderately At Risk':'moderate','Critically At Risk':'critical'};
+  const gradeData = { enrollment_id:enrollId, student_name:sName, class_id:currentClassId, class_name:currentClassData?.name||'', subject_name:currentClassData?.subject||'', finals_grade:grade, average_grade:grade, risk_level:risk, passing_status:status, encoded_by:currentUser.uid, updated_at:firebase.firestore.FieldValue.serverTimestamp() };
+  try {
+    let docId = gradeDocId;
+    if (gradeDocId) { await db.collection('grades').doc(gradeDocId).update(gradeData); }
+    else { const r = await db.collection('grades').add({...gradeData,created_at:firebase.firestore.FieldValue.serverTimestamp()}); docId=r.id; input.setAttribute('data-gradedoc',docId); }
+    const s = _cachedStudents.find(x=>x.enrollment_id===enrollId);
+    if (s) { s.has_grade=true; s.avg=grade; s.grade_doc_id=docId; }
+    const rEl = document.getElementById('risk_'+enrollId);
+    const sEl = document.getElementById('status_'+enrollId);
+    if (rEl) rEl.innerHTML=`<span class="risk-badge ${riskMap[risk]||'safe'}">${risk}</span>`;
+    if (sEl) sEl.innerHTML=statusBadge(status);
+    const ind = document.getElementById('saveIndicator');
+    if (ind) { ind.style.display='flex'; clearTimeout(ind._t); ind._t=setTimeout(()=>ind.style.display='none',1800); }
+    input.style.borderColor='var(--green)'; setTimeout(()=>input.style.borderColor='var(--border)',1500);
+  } catch(err) { input.style.borderColor='var(--critical)'; showToast('Save failed: '+err.message,'error'); }
+}
   if (midtermVal !== '' && (isNaN(midterm) || midterm < 0 || midterm > 100)) {
-    showToast('Midterm grade must be between 0 and 100.', 'error'); return;
+    showToast('Grade must be 0–100.', 'error'); return;
   }
   if (finalsVal !== '' && (isNaN(finals) || finals < 0 || finals > 100)) {
     showToast('Finals grade must be between 0 and 100.', 'error'); return;
@@ -430,7 +410,7 @@ async function confirmEditGrade() {
     class_id:      currentClassId,
     class_name:    currentClassData?.name    || '',
     subject_name:  currentClassData?.subject || '',
-    midterm_grade: midtermVal !== '' ? midterm : null,
+    
     finals_grade:  finalsVal !== '' ? finals : null,
     average_grade: avg,
     grade_status:  finalsVal === '' ? 'midterm_only' : 'complete',
@@ -490,211 +470,128 @@ function loadingHTML() { return `<div style="display:flex;align-items:center;jus
 /* =============================================
    PDF EXPORT FUNCTIONS
    ============================================= */
-/* ── Shared PDF builder ── */
 function buildPDF(title, subtitle, columns, rows, filename) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   const now = new Date().toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
 
-  // Dark green header bar
+  // Header background
   doc.setFillColor(26, 53, 32);
-  doc.rect(0, 0, 297, 28, 'F');
+  doc.rect(0, 0, 210, 28, 'F');
 
-  // Header text
+  // Logo text
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
   doc.text('EduTrack AI', 14, 11);
-  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
   doc.setTextColor(180, 220, 180);
   doc.text('Academic Risk & Performance Monitor — Gordon College', 14, 17);
   doc.text(`Generated: ${now}`, 14, 23);
 
-  // Report title
+  // Title
   doc.setTextColor(26, 53, 32);
-  doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
   doc.text(title, 14, 38);
+
   if (subtitle) {
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
-    doc.text(subtitle, 14, 44);
+    doc.text(subtitle, 14, 45);
   }
 
   // Table
   doc.autoTable({
     head: [columns],
     body: rows,
-    startY: subtitle ? 49 : 44,
+    startY: subtitle ? 50 : 44,
     theme: 'grid',
-    headStyles: { fillColor:[46,125,50], textColor:255, fontStyle:'bold', fontSize:8.5 },
-    bodyStyles: { fontSize:8, textColor:[30,30,30] },
-    alternateRowStyles: { fillColor:[240,248,240] },
-    columnStyles: {
-      0: { cellWidth: 22 },  // Student ID — narrow
-      1: { cellWidth: 55 },  // Student Name — wider
+    headStyles: {
+      fillColor: [46, 125, 50],
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 9
     },
-    margin: { left:14, right:14 }
+    bodyStyles: { fontSize: 8.5, textColor: [30, 30, 30] },
+    alternateRowStyles: { fillColor: [240, 248, 240] },
+    columnStyles: { 0: { cellWidth: 55 } },
+    margin: { left: 14, right: 14 }
   });
 
-  // Page numbers
-  const pc = doc.internal.getNumberOfPages();
-  for (let i=1;i<=pc;i++) {
+  // Footer
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.setFontSize(8); doc.setTextColor(150);
-    doc.text(`EduTrack AI — Confidential | Page ${i} of ${pc}`, 14, 205);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(`EduTrack AI — Confidential | Page ${i} of ${pageCount}`, 14, 290);
   }
+
   doc.save(filename);
   showToast('PDF exported successfully!');
 }
 
-/* ── Risk Reports Export with Block filter ── */
-let _exportClasses = [], _exportSelected = [], _exportBlock = 'all';
-
-async function exportReportPDF() { openExportFilter(); }
-
-async function openExportFilter() {
-  const snap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
-  _exportClasses  = snap.docs.map(d=>({id:d.id,...d.data()}));
-  _exportSelected = _exportClasses.map(c=>c.id);
-  _exportBlock    = 'all';
-
-  // Get unique blocks from class names (e.g. "BSCS 2B" → B)
-  const blocks = [...new Set(_exportClasses.map(c=>(c.block)||(c.name?.match(/([A-Z])$/)?.[1])||''))].filter(Boolean).sort();
-
-  document.getElementById('exportFilterBody').innerHTML = `
-    <p style="font-size:0.84rem;color:var(--text2);margin-bottom:12px">Select which class(es) to include:</p>
-    <div class="form-group" style="margin-bottom:12px">
-      <label class="form-label">Filter by Block</label>
-      <div class="chip-group">
-        <button class="chip active" id="chipBlockAll" onclick="filterExportByBlock('all',this)">All Blocks</button>
-        ${blocks.map(b=>`<button class="chip" onclick="filterExportByBlock('${b}',this)">Block ${b}</button>`).join('')}
-      </div>
-    </div>
-    <label class="form-label">Classes</label>
-    <div class="chip-group" id="exportClassChips">
-      <button class="chip active" id="chipAll" onclick="toggleAllExport(this)">✅ All Classes</button>
-      ${_exportClasses.map(c=>`
-        <button class="chip active" data-id="${c.id}" data-block="${c.block||c.name?.match(/([A-Z])$/)?.[1]||''}"
-          onclick="toggleExportChip(this,'${c.id}')">
-          ${c.name} — ${c.subject||''}
-        </button>`).join('')}
-    </div>`;
-  document.getElementById('exportFilterModal').classList.remove('hidden');
-}
-
-function filterExportByBlock(block, el) {
-  _exportBlock = block;
-  document.querySelectorAll('#exportFilterBody .chip[id^="chipBlock"], #exportFilterBody .chip:not([data-id]):not(#chipAll)').forEach(c=>c.classList.remove('active'));
-  el.classList.add('active');
-  // Show/hide class chips by block
-  document.querySelectorAll('[data-id]').forEach(chip => {
-    const b = chip.getAttribute('data-block');
-    const show = block==='all' || b===block;
-    chip.style.display = show ? '' : 'none';
-    if (show) chip.classList.add('active'); else chip.classList.remove('active');
-  });
-  _exportSelected = _exportClasses.filter(c=>{
-    const b = c.block||(c.name?.match(/([A-Z])$/)?.[1])||'';
-    return block==='all'||b===block;
-  }).map(c=>c.id);
-  const allChip = document.getElementById('chipAll');
-  if (allChip) allChip.classList.toggle('active', _exportSelected.length===_exportClasses.length);
-}
-
-function toggleExportChip(el, id) {
-  el.classList.toggle('active');
-  _exportSelected = el.classList.contains('active') ? [..._exportSelected,id] : _exportSelected.filter(x=>x!==id);
-  const allChip = document.getElementById('chipAll');
-  if (allChip) allChip.classList.toggle('active', _exportSelected.length===_exportClasses.length);
-}
-function toggleAllExport(el) {
-  const activate = !el.classList.contains('active');
-  el.classList.toggle('active', activate);
-  _exportSelected = activate ? _exportClasses.map(c=>c.id) : [];
-  document.querySelectorAll('[data-id]').forEach(c=>{ if(c.style.display!=='none') c.classList.toggle('active', activate); });
-}
-
-async function confirmExportPDF() {
-  if (!_exportSelected.length) { showToast('Select at least one class.','error'); return; }
-  closeModal('exportFilterModal');
+async function exportReportPDF() {
   showToast('Generating PDF…');
   try {
-    const selected = _exportClasses.filter(c=>_exportSelected.includes(c.id));
+    const classSnap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
+    const classes   = classSnap.docs.map(d => ({id:d.id,...d.data()}));
+
     const rows = [];
-    for (const c of selected) {
+    for (const c of classes) {
       const studs = await getStudentsWithGrades(c.id);
-      studs.filter(s=>s.has_grade).sort((a,b)=>a.student_name.localeCompare(b.student_name)).forEach(s=>{
-        const remarks = !s.has_finals ? 'Finals not yet encoded' : '';
+      studs.filter(s => s.has_grade).forEach(s => {
         rows.push([
-          s.student_number||'—',
           s.student_name,
           c.name,
-          s.midterm?s.midterm+'%':'—',
-          s.finals?s.finals+'%':'—',
-          s.avg.toFixed(1)+'%',
+          s.avg.toFixed(1) + '%',
           computeRisk(s.avg),
-          computeStatus(s.avg),
-          remarks
+          computeStatus(s.avg)
         ]);
       });
     }
-    if (!rows.length) { showToast('No grade data to export yet.','error'); return; }
-    const label = selected.length===_exportClasses.length?'All Classes':selected.map(c=>c.name).join(', ');
+
+    if (!rows.length) { showToast('No grade data to export yet.', 'error'); return; }
+
+    rows.sort((a,b) => a[0].localeCompare(b[0]));
+
     buildPDF(
       'Academic Risk Report',
-      `${label} | Teacher: ${currentUser.name} | ${new Date().toLocaleDateString('en-PH')}`,
-      ['Student ID','Student Name','Class','Midterm (%)','Finals (%)','Average','Risk Level','Status','Remarks'],
+      `Teacher: ${currentUser.name} | ${new Date().toLocaleDateString('en-PH')}`,
+      ['Student Name', 'Class', 'Average', 'Risk Level', 'Status'],
       rows,
-      `EduTrack_Report_${Date.now()}.pdf`
+      `EduTrack_Risk_Report_${Date.now()}.pdf`
     );
-  } catch(err) { showToast('Export failed: '+err.message,'error'); }
+  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
 }
 
-/* ── Class Students Export ── */
 async function exportClassStudentsPDF() {
-  if (!currentClassId||!currentClassData) return;
+  if (!currentClassId || !currentClassData) return;
   showToast('Generating PDF…');
   try {
     const studs = await getStudentsWithGrades(currentClassId);
-    const rows = [...studs].sort((a,b)=>a.student_name.localeCompare(b.student_name)).map(s=>[
-      s.student_number||'—',
+    const sorted = [...studs].sort((a,b) => a.student_name.localeCompare(b.student_name));
+    const rows = sorted.map(s => [
       s.student_name,
-      s.has_grade?s.midterm+'%':'—',
-      s.has_grade?s.finals+'%':'—',
-      s.has_grade?s.avg.toFixed(1)+'%':'—',
-      s.has_grade?computeRisk(s.avg):'—',
-      s.has_grade?computeStatus(s.avg):'—',
-      !s.has_grade?'Not encoded':!s.has_finals?'Finals pending':''
+      s.has_grade ? s.midterm + '%' : '—',
+      s.has_grade ? s.finals  + '%' : '—',
+      s.has_grade ? s.avg.toFixed(1) + '%' : '—',
+      s.has_grade ? computeRisk(s.avg) : '—',
+      s.has_grade ? computeStatus(s.avg) : '—'
     ]);
+
     buildPDF(
       `Class Report — ${currentClassData.name}`,
       `Subject: ${currentClassData.subject} | Professor: ${currentUser.name}`,
-      ['Student ID','Student Name','Midterm (%)','Finals (%)','Average','Risk Level','Status','Remarks'],
+      ['Student ID', 'Student Name', 'Final Grade (%)', 'Risk Level', 'Status'],
       rows,
       `EduTrack_${currentClassData.name.replace(/\s/g,'_')}_${Date.now()}.pdf`
     );
-  } catch(err) { showToast('Export failed: '+err.message,'error'); }
+  } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
 }
 </script>
-
-<!-- Export Filter Modal -->
-<div class="modal-overlay hidden" id="exportFilterModal" role="dialog" aria-modal="true">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 class="modal-title">Export Risk Report</h3>
-      <button class="modal-close" onclick="closeModal('exportFilterModal')" aria-label="Close">✕</button>
-    </div>
-    <div class="modal-body" id="exportFilterBody">
-      <div style="text-align:center;padding:20px"><div class="spinner" style="width:24px;height:24px;margin:auto;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('exportFilterModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmExportPDF()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export PDF
-      </button>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>
