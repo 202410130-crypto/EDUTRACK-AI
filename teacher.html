@@ -38,7 +38,7 @@
     </button>
   </div>
 </aside>
-
+ 
 <div class="main-content">
   <header class="topbar">
     <div class="topbar-left"><h2 id="topbarTitle">My Classes</h2><div class="breadcrumb" id="topbarBreadcrumb">Teacher Dashboard</div></div>
@@ -46,12 +46,12 @@
   </header>
   <main class="page-content" id="pageContent" aria-live="polite"></main>
 </div>
-
+ 
 <!-- Auto-save indicator -->
 <div id="saveIndicator" style="position:fixed;top:16px;right:16px;background:var(--green);color:#fff;padding:8px 16px;border-radius:8px;font-size:0.82rem;font-weight:600;z-index:999;display:none;align-items:center;gap:7px;box-shadow:0 3px 12px rgba(0,0,0,0.2)">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="width:13px;height:13px"><polyline points="20 6 9 17 4 12"/></svg> Saved
 </div>
-
+ 
 <!-- Delete Student Modal -->
 <div class="modal-overlay hidden" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
   <div class="modal">
@@ -63,7 +63,7 @@
     </div>
   </div>
 </div>
-
+ 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -73,7 +73,7 @@
 <script src="firebase.js"></script>
 <script src="app.js"></script>
 <script>
-
+ 
 let currentUser    = null;
 let currentClassId = null;
 let currentClassData = null;
@@ -82,7 +82,7 @@ let editingGradeDocId   = null;
 let deletingEnrollmentId = null;
 let deletingGradeDocId   = null;
 let searchTerm = '';
-
+ 
 document.addEventListener('DOMContentLoaded', () => {
   initPage('teacher', (user) => {
     currentUser = user;
@@ -90,30 +90,30 @@ document.addEventListener('DOMContentLoaded', () => {
     renderClassesView();
   });
 });
-
+ 
 function showView(view, linkEl) {
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   if (linkEl) linkEl.classList.add('active');
   if (view === 'classes') renderClassesView();
   else renderReportsView();
 }
-
+ 
 /* ── Classes View ── */
 async function renderClassesView() {
   currentClassId = null;
   setTopbar('My Classes','Teacher Dashboard');
   document.getElementById('topbarRight').innerHTML = '';
   document.getElementById('pageContent').innerHTML = loadingHTML();
-
+ 
   try {
     const snap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
     const classes = snap.docs.map(d=>({id:d.id,...d.data()}));
-
+ 
     if (!classes.length) {
       document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No classes assigned yet</div><div class="empty-state-sub">An admin will assign classes to your account.</div></div>`;
       return;
     }
-
+ 
     // Get student counts from enrollments
     const cards = await Promise.all(classes.map(async (c,i) => {
       const eSnap = await db.collection('enrollments').where('class_id','==',c.id).get();
@@ -142,7 +142,7 @@ async function renderClassesView() {
     document.getElementById('pageContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Error loading classes</div><div class="empty-state-sub">${err.message}</div></div>`;
   }
 }
-
+ 
 /* ── Class Detail ── */
 async function openClass(classId) {
   currentClassId = classId;
@@ -159,14 +159,14 @@ async function openClass(classId) {
     renderClassDashboard(classId);
   } catch(err) { showToast('Failed to load class.','error'); }
 }
-
+ 
 function switchClassTab(tab,el) {
   document.querySelectorAll('#classTabRow .tab-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
   if (tab==='dashboard') renderClassDashboard(currentClassId);
   else renderClassStudents(currentClassId);
 }
-
+ 
 /* ── Class Dashboard ── */
 async function renderClassDashboard(classId) {
   document.getElementById('pageContent').innerHTML = loadingHTML();
@@ -178,7 +178,7 @@ async function renderClassDashboard(classId) {
           C=students.filter(s=>s.avg>=75&&s.avg<80).length, 
           D=students.filter(s=>s.avg<75).length;
     const mb=Math.max(A,B,C,D,1);
-
+ 
     document.getElementById('pageContent').innerHTML = `
       <div class="stats-row">
         <div class="stat-card safe"><div class="stat-card-top"><span class="stat-card-label">Safe</span><div class="stat-card-icon">✅</div></div><div class="stat-card-value">${risk.safe}</div><div class="stat-card-sub">On track</div></div>
@@ -209,7 +209,7 @@ async function renderClassDashboard(classId) {
       </div>`;
   } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
 }
-
+ 
 /* ── Class Students ── */
 async function renderClassStudents(classId) {
   document.getElementById('pageContent').innerHTML = loadingHTML();
@@ -218,31 +218,28 @@ async function renderClassStudents(classId) {
     const filtered = sortStudents(
       searchTerm ? all.filter(s=>s.student_name.toLowerCase().includes(searchTerm.toLowerCase())) : all
     );
-/*TABLE*/
-    const riskMap2 = {'Safe':'safe','Slightly At Risk':'slight','Moderately At Risk':'moderate','Critically At Risk':'critical'};
+    const rMap={Safe:'safe','Slightly At Risk':'slight','Moderately At Risk':'moderate','Critically At Risk':'critical'};
     const rows = filtered.map(s=>`<tr>
       <td style="font-size:0.75rem;color:var(--text3);white-space:nowrap">${s.student_number||'—'}</td>
       <td style="font-weight:500">${s.student_name}</td>
       <td style="padding:4px 8px">
         <input type="number" min="0" max="100" step="0.01"
           value="${s.has_grade ? s.avg : ''}" placeholder="—"
-          data-enroll="${s.enrollment_id}" data-gradedoc="${s.grade_doc_id||''}"
+          data-enroll="${s.enrollment_id}"
+          data-gradedoc="${s.grade_doc_id||''}"
           data-name="${s.student_name.replace(/"/g,'&quot;')}"
           onchange="saveInlineGrade(this)"
           onfocus="this.select();this.style.borderColor='var(--green)'"
           onblur="this.style.borderColor='var(--border)'"
           style="width:80px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:0.88rem;font-weight:600;text-align:center;background:var(--surface);color:var(--text)"/>
       </td>
-      <td id="risk_${s.enrollment_id}">${s.has_grade?`<span class="risk-badge ${riskMap2[computeRisk(s.avg)]||'safe'}">${computeRisk(s.avg)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+      <td id="risk_${s.enrollment_id}">${s.has_grade?`<span class="risk-badge ${rMap[computeRisk(s.avg)]||'safe'}">${computeRisk(s.avg)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
       <td id="status_${s.enrollment_id}">${s.has_grade?statusBadge(computeStatus(s.avg)):'<span style="color:var(--text3)">—</span>'}</td>
-      <td>
-        <button class="action-btn delete" title="Remove ${s.student_name}"
-          onclick="openDelete('${s.enrollment_id}','${s.student_name.replace(/'/g,"\\'")}','${s.grade_doc_id||''}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-        </button>
-      </td>
+      <td><button class="action-btn delete" onclick="openDelete('${s.enrollment_id}','${s.student_name.replace(/'/g,"\'")}','${s.grade_doc_id||''}')" title="Remove">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      </button></td>
     </tr>`).join('');
-
+ 
     document.getElementById('pageContent').innerHTML = `
       <div class="panel">
         <div class="panel-header">
@@ -251,24 +248,25 @@ async function renderClassStudents(classId) {
             <label for="studentSearch" class="sr-only">Search students</label>
             <input type="search" id="studentSearch" class="search-input" placeholder="Search student…" title="Search by name" aria-label="Search students" oninput="searchTerm=this.value;renderClassStudents('${classId}')" value="${searchTerm}"/>
           </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-size:0.75rem;color:var(--text3)">${_cachedStudents.filter(s=>s.has_grade).length} encoded · ${_cachedStudents.filter(s=>!s.has_grade).length} pending</span>
-            <button class="btn btn-primary" style="padding:5px 11px;font-size:0.75rem" onclick="exportClassStudentsPDF()">Export PDF</button>
-          </div>
+          <span style="font-size:0.78rem;color:var(--text3)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;vertical-align:middle" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            ${filtered.length} student${filtered.length!==1?'s':''}
+          </span>
         </div>
-        <div class="scroll-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg> Swipe to see more</div>
         <div style="padding:8px 16px;background:var(--green-light);border-bottom:1px solid rgba(46,125,50,0.15);font-size:0.78rem;color:var(--green)">
-        💡 Click a grade cell → type Final Grade (0–100) → press <kbd style="background:rgba(255,255,255,0.6);padding:1px 5px;border-radius:4px">Enter</kbd> to auto-save.
+        💡 Click any cell → type Final Grade (0–100) → <kbd style="background:rgba(255,255,255,0.7);padding:1px 5px;border-radius:3px;font-size:0.72rem">Enter</kbd> to auto-save.
       </div>
-      <div class="table-scroll-wrap">
-          <table class="data-table" style="min-width:540px" aria-label="Grade spreadsheet">
+      <div class="scroll-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg> Swipe to see more</div>
+        <div class="table-scroll-wrap">
+          <table class="data-table" style="min-width:520px" aria-label="Students sorted alphabetically">
             <thead>
               <tr>
+                <th scope="col" style="width:88px">Student ID</th>
                 <th scope="col">Student Name</th>
-                <th scope="col">Average</th>
-                <th scope="col">Final Grade (%)</th>
+                <th scope="col" style="width:112px">Final Grade (%)</th>
                 <th scope="col">Risk Level</th>
-                <th scope="col">Actions</th>
+                <th scope="col">Status</th>
+                <th scope="col" style="width:44px">Del</th>
               </tr>
             </thead>
             <tbody>${rows || '<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-title">No students enrolled yet</div><div class="empty-state-sub">Ask the admin to assign students to this class.</div></div></td></tr>'}</tbody>
@@ -277,17 +275,17 @@ async function renderClassStudents(classId) {
       </div>`;
   } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
 }
-
+ 
 /* ── Reports View ── */
 async function renderReportsView() {
   setTopbar('Risk Reports','Teacher Dashboard');
   document.getElementById('topbarRight').innerHTML = `<button class="topbar-btn primary" onclick="exportReportPDF()" title="Export PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button>`;
   document.getElementById('pageContent').innerHTML = loadingHTML();
-
+ 
   try {
     const classSnap = await db.collection('classes').where('profEmail','==',currentUser.email).get();
     const classes = classSnap.docs.map(d=>({id:d.id,...d.data()}));
-
+ 
     const riskGroups = {critical:[],moderate:[],slight:[],safe:[]};
     for (const c of classes) {
       const studs = await getStudentsWithGrades(c.id);
@@ -297,7 +295,7 @@ async function renderReportsView() {
         riskGroups[key].push({...s, className:c.name});
       });
     }
-
+ 
     const section = (level,key) => {
       const items = sortStudents(riskGroups[key]);
       if (!items.length) return '';
@@ -307,37 +305,46 @@ async function renderReportsView() {
         <tbody>${items.map(s=>`<tr><td>${s.student_name}</td><td>${s.className}</td><td>${s.avg.toFixed(1)}%</td><td>${riskBadge(level)}</td></tr>`).join('')}</tbody>
         </table></div>`;
     };
-
+ 
     const html = section('Critically At Risk','critical')+section('Moderately At Risk','moderate')+section('Slightly At Risk','slight')+section('Safe','safe');
     document.getElementById('pageContent').innerHTML = html || `<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No grade data yet</div><div class="empty-state-sub">Encode student grades first.</div></div>`;
   } catch(err) { document.getElementById('pageContent').innerHTML=`<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">${err.message}</div></div>`; }
 }
-
+ 
 /* ── Firestore helpers ── */
 async function getStudentsWithGrades(classId) {
   const [eSnap, gSnap] = await Promise.all([
     db.collection('enrollments').where('class_id','==',classId).get(),
     db.collection('grades').where('class_id','==',classId).get()
   ]);
+  // Dedup grades — keep most recent per enrollment
   const gradesMap = {};
   gSnap.docs.forEach(d => {
     const data = d.data(), key = data.enrollment_id;
     if (!gradesMap[key]||(data.updated_at?.seconds||0)>(gradesMap[key]?.updated_at?.seconds||0))
       gradesMap[key] = {id:d.id,...data};
   });
+  // Dedup enrollments — one row per student
   const seen = new Set();
   const result = eSnap.docs
-    .filter(d=>{ const n=d.data().student_name; if(seen.has(n)) return false; seen.add(n); return true; })
+    .filter(d => { const n=d.data().student_name; if(seen.has(n)) return false; seen.add(n); return true; })
     .map(d => {
-      const e = {enrollment_id:d.id,...d.data()};
-      const g = gradesMap[d.id];
+      const e={enrollment_id:d.id,...d.data()}, g=gradesMap[d.id];
       const fg = g?.finals_grade ?? g?.average_grade ?? null;
-      return { enrollment_id:d.id, student_name:e.student_name, student_email:e.student_email||'', student_number:(e.student_email||'').split('@')[0]||'', avg:fg||0, grade_doc_id:g?.id||null, has_grade:fg!==null };
+      return {
+        enrollment_id:  d.id,
+        student_name:   e.student_name,
+        student_email:  e.student_email||'',
+        student_number: (e.student_email||'').split('@')[0]||'',
+        avg:            fg !== null ? fg : 0,
+        grade_doc_id:   g?.id||null,
+        has_grade:      fg !== null
+      };
     });
   _cachedStudents = result;
   return result;
 }
-
+ 
 function countRisk(students) {
   return students.filter(s=>s.has_grade).reduce((a,s)=>{
     const r=computeRisk(s.avg);
@@ -346,108 +353,101 @@ function countRisk(students) {
     return a;
   },{safe:0,slight:0,moderate:0,critical:0});
 }
-
-/* ── Grade preview ── */
-function previewGrade()  {}
-function openEditGrade() {}
-function confirmEditGrade() {}
-
-/* ── Inline grade save ── */
+ 
+/* ── Inline grade encoding (Final Grade only) ── */
 let _cachedStudents = [];
+ 
+function openEditGrade()    {}   // no-op — replaced by inline
+function previewGrade()     {}
+function confirmEditGrade() {}
+ 
 async function saveInlineGrade(input) {
   const enrollId   = input.getAttribute('data-enroll');
   const gradeDocId = input.getAttribute('data-gradedoc') || null;
   const sName      = input.getAttribute('data-name');
   const rawVal     = input.value.trim();
+ 
+  // Empty → clear grade
   if (!rawVal) {
-    if (gradeDocId) { try { await db.collection('grades').doc(gradeDocId).delete(); } catch(e){} }
+    if (gradeDocId) {
+      try { await db.collection('grades').doc(gradeDocId).delete(); } catch(e){}
+    }
     const s = _cachedStudents.find(x=>x.enrollment_id===enrollId);
     if (s) { s.has_grade=false; s.avg=0; input.setAttribute('data-gradedoc',''); }
-    const rEl = document.getElementById('risk_'+enrollId);
-    const sEl = document.getElementById('status_'+enrollId);
-    if (rEl) rEl.innerHTML='<span style="color:var(--text3)">—</span>';
-    if (sEl) sEl.innerHTML='<span style="color:var(--text3)">—</span>';
+    const rEl=document.getElementById('risk_'+enrollId);
+    const sEl=document.getElementById('status_'+enrollId);
+    if(rEl) rEl.innerHTML='<span style="color:var(--text3)">—</span>';
+    if(sEl) sEl.innerHTML='<span style="color:var(--text3)">—</span>';
     return;
   }
+ 
   const grade = parseFloat(rawVal);
-  if (isNaN(grade)||grade<0||grade>100) { input.style.borderColor='var(--critical)'; showToast('Grade must be 0–100.','error'); return; }
-  const risk = computeRisk(grade), status = computeStatus(grade);
+  if (isNaN(grade)||grade<0||grade>100) {
+    input.style.borderColor='var(--critical)';
+    showToast('Grade must be between 0 and 100.','error');
+    return;
+  }
+ 
+  const risk   = computeRisk(grade);
+  const status = computeStatus(grade);
   const riskMap = {'Safe':'safe','Slightly At Risk':'slight','Moderately At Risk':'moderate','Critically At Risk':'critical'};
-  const gradeData = { enrollment_id:enrollId, student_name:sName, class_id:currentClassId, class_name:currentClassData?.name||'', subject_name:currentClassData?.subject||'', finals_grade:grade, average_grade:grade, risk_level:risk, passing_status:status, encoded_by:currentUser.uid, updated_at:firebase.firestore.FieldValue.serverTimestamp() };
+ 
+  const gradeData = {
+    enrollment_id:  enrollId,
+    student_name:   sName,
+    class_id:       currentClassId,
+    class_name:     currentClassData?.name    || '',
+    subject_name:   currentClassData?.subject || '',
+    finals_grade:   grade,
+    average_grade:  grade,
+    risk_level:     risk,
+    passing_status: status,
+    encoded_by:     currentUser.uid,
+    updated_at:     firebase.firestore.FieldValue.serverTimestamp()
+  };
+ 
   try {
     let docId = gradeDocId;
-    if (gradeDocId) { await db.collection('grades').doc(gradeDocId).update(gradeData); }
-    else { const r = await db.collection('grades').add({...gradeData,created_at:firebase.firestore.FieldValue.serverTimestamp()}); docId=r.id; input.setAttribute('data-gradedoc',docId); }
+    if (gradeDocId) {
+      await db.collection('grades').doc(gradeDocId).update(gradeData);
+    } else {
+      const ref = await db.collection('grades').add({
+        ...gradeData, created_at: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      docId = ref.id;
+      input.setAttribute('data-gradedoc', docId);
+    }
+ 
     const s = _cachedStudents.find(x=>x.enrollment_id===enrollId);
     if (s) { s.has_grade=true; s.avg=grade; s.grade_doc_id=docId; }
-    const rEl = document.getElementById('risk_'+enrollId);
-    const sEl = document.getElementById('status_'+enrollId);
-    if (rEl) rEl.innerHTML=`<span class="risk-badge ${riskMap[risk]||'safe'}">${risk}</span>`;
-    if (sEl) sEl.innerHTML=statusBadge(status);
+ 
+    const rEl=document.getElementById('risk_'+enrollId);
+    const sEl=document.getElementById('status_'+enrollId);
+    if(rEl) rEl.innerHTML=`<span class="risk-badge ${riskMap[risk]||'safe'}">${risk}</span>`;
+    if(sEl) sEl.innerHTML=statusBadge(status);
+ 
     const ind = document.getElementById('saveIndicator');
-    if (ind) { ind.style.display='flex'; clearTimeout(ind._t); ind._t=setTimeout(()=>ind.style.display='none',1800); }
-    input.style.borderColor='var(--green)'; setTimeout(()=>input.style.borderColor='var(--border)',1500);
-  } catch(err) { input.style.borderColor='var(--critical)'; showToast('Save failed: '+err.message,'error'); }
-}
-  if (midtermVal !== '' && (isNaN(midterm) || midterm < 0 || midterm > 100)) {
-    showToast('Grade must be 0–100.', 'error'); return;
-  }
-  if (finalsVal !== '' && (isNaN(finals) || finals < 0 || finals > 100)) {
-    showToast('Finals grade must be between 0 and 100.', 'error'); return;
-  }
-
-  // Compute average based on what's available
-  const avg = (midtermVal !== '' && finalsVal !== '')
-  ? (midterm + finals) / 2
-  : midtermVal !== '' ? midterm : finals;
-  const risk   = computeRisk(avg);
-  const status = computeStatus(avg);
-  const studentName = document.getElementById('editStudentName').value;
-
-  const gradeData = {
-    enrollment_id: editingEnrollmentId,
-    student_name:  studentName,
-    class_id:      currentClassId,
-    class_name:    currentClassData?.name    || '',
-    subject_name:  currentClassData?.subject || '',
-    
-    finals_grade:  finalsVal !== '' ? finals : null,
-    average_grade: avg,
-    grade_status:  finalsVal === '' ? 'midterm_only' : 'complete',
-    risk_level:    risk,
-    passing_status:status,
-    encoded_by:    currentUser.uid,
-    updated_at:    firebase.firestore.FieldValue.serverTimestamp()
-  };
-
-  try {
-    if (editingGradeDocId) {
-      await db.collection('grades').doc(editingGradeDocId).update(gradeData);
-    } else {
-      await db.collection('grades').add(gradeData);
+    if (ind) {
+      ind.style.display='flex';
+      clearTimeout(ind._t);
+      ind._t = setTimeout(()=>ind.style.display='none', 1800);
     }
-    // Save risk assessment
-    await db.collection('risk_assessments').doc(`${currentClassId}_${editingEnrollmentId}`).set({
-      student_name:   studentName,
-      class_id:       currentClassId,
-      average_grade:  avg,
-      risk_level:     risk,
-      passing_status: status,
-      assessed_at:    firebase.firestore.FieldValue.serverTimestamp()
-    });
-    closeModal('editGradeModal');
-    showToast('Grades saved successfully.');
-    renderClassStudents(currentClassId);
-  } catch(err) { showToast('Failed to save grades: '+err.message,'error'); }
+    input.style.borderColor='var(--green)';
+    setTimeout(()=>input.style.borderColor='var(--border)', 1500);
+ 
+  } catch(err) {
+    input.style.borderColor='var(--critical)';
+    showToast('Save failed: '+err.message, 'error');
+  }
 }
-
+ 
 function openDelete(enrollmentId, studentName, gradeDocId) {
   deletingEnrollmentId = enrollmentId;
   deletingGradeDocId   = gradeDocId || null;
   document.getElementById('deleteStudentName').textContent = studentName;
   document.getElementById('deleteModal').classList.remove('hidden');
 }
-
+ 
 async function confirmDelete() {
   try {
     const batch = db.batch();
@@ -462,11 +462,11 @@ async function confirmDelete() {
     renderClassStudents(currentClassId);
   } catch(err) { showToast('Failed to remove student: '+err.message,'error'); }
 }
-
+ 
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function setTopbar(t,b) { document.getElementById('topbarTitle').textContent=t; document.getElementById('topbarBreadcrumb').textContent=b; }
 function loadingHTML() { return `<div style="display:flex;align-items:center;justify-content:center;height:40vh"><div class="spinner" style="width:30px;height:30px;border-width:3px;border-color:rgba(46,125,50,0.18);border-top-color:var(--green)"></div></div>`; }
-
+ 
 /* =============================================
    PDF EXPORT FUNCTIONS
    ============================================= */
@@ -474,11 +474,11 @@ function buildPDF(title, subtitle, columns, rows, filename) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   const now = new Date().toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
-
+ 
   // Header background
   doc.setFillColor(26, 53, 32);
   doc.rect(0, 0, 210, 28, 'F');
-
+ 
   // Logo text
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
@@ -489,20 +489,20 @@ function buildPDF(title, subtitle, columns, rows, filename) {
   doc.setTextColor(180, 220, 180);
   doc.text('Academic Risk & Performance Monitor — Gordon College', 14, 17);
   doc.text(`Generated: ${now}`, 14, 23);
-
+ 
   // Title
   doc.setTextColor(26, 53, 32);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.text(title, 14, 38);
-
+ 
   if (subtitle) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
     doc.text(subtitle, 14, 45);
   }
-
+ 
   // Table
   doc.autoTable({
     head: [columns],
@@ -520,7 +520,7 @@ function buildPDF(title, subtitle, columns, rows, filename) {
     columnStyles: { 0: { cellWidth: 55 } },
     margin: { left: 14, right: 14 }
   });
-
+ 
   // Footer
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
@@ -529,17 +529,17 @@ function buildPDF(title, subtitle, columns, rows, filename) {
     doc.setTextColor(150);
     doc.text(`EduTrack AI — Confidential | Page ${i} of ${pageCount}`, 14, 290);
   }
-
+ 
   doc.save(filename);
   showToast('PDF exported successfully!');
 }
-
+ 
 async function exportReportPDF() {
   showToast('Generating PDF…');
   try {
     const classSnap = await db.collection('classes').where('profEmail','==', currentUser.email).get();
     const classes   = classSnap.docs.map(d => ({id:d.id,...d.data()}));
-
+ 
     const rows = [];
     for (const c of classes) {
       const studs = await getStudentsWithGrades(c.id);
@@ -553,11 +553,11 @@ async function exportReportPDF() {
         ]);
       });
     }
-
+ 
     if (!rows.length) { showToast('No grade data to export yet.', 'error'); return; }
-
+ 
     rows.sort((a,b) => a[0].localeCompare(b[0]));
-
+ 
     buildPDF(
       'Academic Risk Report',
       `Teacher: ${currentUser.name} | ${new Date().toLocaleDateString('en-PH')}`,
@@ -567,7 +567,7 @@ async function exportReportPDF() {
     );
   } catch(err) { showToast('Export failed: ' + err.message, 'error'); }
 }
-
+ 
 async function exportClassStudentsPDF() {
   if (!currentClassId || !currentClassData) return;
   showToast('Generating PDF…');
@@ -582,11 +582,11 @@ async function exportClassStudentsPDF() {
       s.has_grade ? computeRisk(s.avg) : '—',
       s.has_grade ? computeStatus(s.avg) : '—'
     ]);
-
+ 
     buildPDF(
       `Class Report — ${currentClassData.name}`,
       `Subject: ${currentClassData.subject} | Professor: ${currentUser.name}`,
-      ['Student ID', 'Student Name', 'Final Grade (%)', 'Risk Level', 'Status'],
+      ['Student Name', 'Midterm', 'Finals', 'Average', 'Risk Level', 'Status'],
       rows,
       `EduTrack_${currentClassData.name.replace(/\s/g,'_')}_${Date.now()}.pdf`
     );
